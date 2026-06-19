@@ -1,0 +1,46 @@
+{
+  "name": "letravail-scraper",
+  "version": "1.0.0",
+  "description": "Production-grade Moroccan jobs scraper system",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "scrape": "tsx src/index.ts",
+    "scrape:all": "tsx src/index.ts scrape --all",
+    "worker": "tsx src/workers/index.ts",
+    "worker:banks": "tsx src/workers/banks.worker.ts",
+    "worker:telecom": "tsx src/workers/telecom.worker.ts",
+    "worker:automotive": "tsx src/workers/automotive.worker.ts",
+    "worker:retail": "tsx src/workers/retail.worker.ts",
+    "worker:government": "tsx src/workers/government.worker.ts",
+    "worker:universities": "tsx src/workers/universities.worker.ts",
+    "scheduler": "tsx src/scheduler/run.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "bullmq": "^5.53.2",
+    "cron": "^4.3.1",
+    "dotenv": "^16.5.0",
+    "ioredis": "^5.6.1",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "prisma": "^6.9.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

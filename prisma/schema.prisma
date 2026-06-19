@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id             String    @id @default(cuid())
+  source         String
+  sourceJobId    String
+  hash           String    @unique
+  slug           String    @unique
+  title          String
+  company        String
+  city           String
+  country        String    @default("Morocco")
+  description    String    @db.Text
+  requirements   String?   @db.Text
+  salary         String?
+  contractType   String?
+  remote         Boolean   @default(false)
+  applicationUrl String
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  companyId  String?
+  locationId String?
+  companyRef Company?  @relation(fields: [companyId], references: [id])
+  location   Location? @relation(fields: [locationId], references: [id])
+  tags       JobTag[]
+
+  @@unique([source, sourceJobId])
+  @@index([slug])
+  @@index([title])
+  @@index([company])
+  @@index([city])
+  @@index([publishedAt])
+  @@index([source])
+  @@index([hash])
+  @@map("jobs")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      Job[]
+
+  @@index([slug])
+  @@index([name])
+  @@map("companies")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  city      String
+  country   String   @default("Morocco")
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs      Job[]
+
+  @@unique([city, country])
+  @@index([city])
+  @@index([slug])
+  @@map("locations")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  jobs      JobTag[]
+
+  @@index([slug])
+  @@index([name])
+  @@map("tags")
+}
+
+model JobTag {
+  jobId String
+  tagId String
+  job   Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  tag   Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, tagId])
+  @@map("job_tags")
+}
+
+model ScrapeLog {
+  id            String   @id @default(cuid())
+  source        String
+  category      String
+  status        String
+  startedAt     DateTime
+  endedAt       DateTime?
+  durationMs    Int?
+  jobsFound     Int      @default(0)
+  jobsInserted  Int      @default(0)
+  jobsUpdated   Int      @default(0)
+  duplicates    Int      @default(0)
+  errorMessage  String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([source])
+  @@index([category])
+  @@index([startedAt])
+  @@index([status])
+  @@map("scrape_logs")
+}

@@ -1,0 +1,5 @@
+# Run every 6 hours
+0 */6 * * * cd /app && npm run scrape -- enqueue --all >> /var/log/letravail-scraper.log 2>&1
+
+# Daily sources at 2 AM
+0 2 * * * cd /app && npm run scrape -- scheduler --once --daily >> /var/log/letravail-scraper.log 2>&1

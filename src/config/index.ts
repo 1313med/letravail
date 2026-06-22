@@ -13,6 +13,14 @@ export const config = {
   maxRetryAttempts: 3,
   cronEvery6Hours: '0 */6 * * *',
   cronDaily: '0 2 * * *',
+  linkedinStorageState: process.env.LINKEDIN_STORAGE_STATE ?? './linkedin-auth.json',
+  linkedinMaxJobs: Number(process.env.LINKEDIN_MAX_JOBS ?? 150),
+  linkedinDelayMs: Number(process.env.LINKEDIN_DELAY_MS ?? 2_000),
+  linkedinScrollRounds: Number(process.env.LINKEDIN_SCROLL_ROUNDS ?? 8),
+  linkedinDetailFetchLimit: Number(process.env.LINKEDIN_DETAIL_FETCH_LIMIT ?? 0),
+  linkedinPageTimeoutMs: Number(process.env.LINKEDIN_PAGE_TIMEOUT_MS ?? 25_000),
+  linkedinMaxPages: Number(process.env.LINKEDIN_MAX_PAGES ?? 10),
+  linkedinFast: process.env.LINKEDIN_FAST === 'true',
 } as const;
 
 export type ScrapeCategory =
@@ -23,7 +31,8 @@ export type ScrapeCategory =
   | 'airlines'
   | 'technology'
   | 'government'
-  | 'universities';
+  | 'universities'
+  | 'linkedin';
 
 export const QUEUE_NAMES = {
   banks: 'scrape-banks',
@@ -32,12 +41,13 @@ export const QUEUE_NAMES = {
   retail: 'scrape-retail',
   government: 'scrape-government',
   universities: 'scrape-universities',
-} as const satisfies Record<Exclude<ScrapeCategory, 'airlines' | 'technology'>, string>;
+} as const satisfies Record<Exclude<ScrapeCategory, 'airlines' | 'technology' | 'linkedin'>, string>;
 
 export const EXTENDED_QUEUE_NAMES = {
   ...QUEUE_NAMES,
   airlines: 'scrape-airlines',
   technology: 'scrape-technology',
+  linkedin: 'scrape-linkedin',
 } as const;
 
 export type QueueName = (typeof EXTENDED_QUEUE_NAMES)[keyof typeof EXTENDED_QUEUE_NAMES];

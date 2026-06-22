@@ -111,6 +111,16 @@ export function isLikelyJobTitle(title: string): boolean {
   return JOB_TITLE_HINTS.test(cleaned) || /[A-Z]{2,}.*[A-Z]{2,}/.test(cleaned);
 }
 
+/** LinkedIn titles are often in English — skip French-keyword requirement. */
+export function isLikelyLinkedInJobTitle(title: string): boolean {
+  const cleaned = title.trim();
+  if (cleaned.length < 4 || cleaned.length > 200) return false;
+  if (NON_JOB_TITLE_PATTERNS.some((p) => p.test(cleaned))) return false;
+  if (/^\d+$/.test(cleaned)) return false;
+  if (/^(view|see|show|linkedin)\b/i.test(cleaned)) return false;
+  return true;
+}
+
 export function isLikelyJobPosting(title: string, url: string): boolean {
   return isLikelyJobUrl(url) && isLikelyJobTitle(title);
 }

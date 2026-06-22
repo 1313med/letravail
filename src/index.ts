@@ -14,6 +14,14 @@ async function main(): Promise<void> {
     switch (command) {
       case 'scrape': {
         const target = args[0];
+        if (target === 'linkedin') {
+          if (args.includes('--fast')) {
+            process.env.LINKEDIN_FAST = 'true';
+          }
+          const stat = await container.scrapeService.scrapeLinkedIn();
+          logSummary([stat]);
+          break;
+        }
         if (!target || target === '--all') {
           const stats = await container.scrapeService.scrapeAll();
           logSummary(stats);
@@ -108,6 +116,7 @@ Usage:
   npm run scrape -- list
 
 Examples:
+  npm run scrape -- scrape linkedin
   npm run scrape -- scrape attijariwafa-bank
   npm run scrape -- scrape banks
   npm run scrape -- scrape --all

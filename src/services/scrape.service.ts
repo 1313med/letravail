@@ -5,6 +5,7 @@ import type { PagePool } from '../lib/browser/page-pool.js';
 import { logger } from '../lib/logger.js';
 import type { JobRepository } from '../repositories/job.repository.js';
 import type { ScrapeLogRepository } from '../repositories/scrape-log.repository.js';
+import { closeLinkedInBrowser } from '../scrapers/linkedin/session.js';
 import type { BaseScraper } from '../scrapers/base.scraper.js';
 import type { Job, PersistResult, ScrapeRunStats } from '../types/job.js';
 
@@ -44,6 +45,43 @@ export class ScrapeService {
 
   async scrapeAll(): Promise<ScrapeRunStats[]> {
     return this.scrapeMany(this.registry);
+  }
+
+  async scrapeLinkedIn(): Promise<ScrapeRunStats> {
+    const { LinkedInScraper } = await import('../scrapers/linkedin/linkedin.scraper.js');
+    const startedAt = new Date();
+    const scraper = new LinkedInScraper();
+
+    let jobs: Job[] = [];
+    let persist: PersistResult = { inserted: 0, updated: 0, duplicates: 0 };
+    let errorMessage: string | undefined;
+
+    try {
+      jobs = await scraper.run();
+      persist = await this.jobRepo.upsertMany(jobs);
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, source: 'linkedin' }, 'LinkedIn scraper failed');
+    }
+
+    const endedAt = new Date();
+    const stats: ScrapeRunStats = {
+      source: 'linkedin',
+      category: 'linkedin',
+      startedAt,
+      endedAt,
+      durationMs: endedAt.getTime() - startedAt.getTime(),
+      jobsFound: jobs.length,
+      jobsInserted: persist.inserted,
+      jobsUpdated: persist.updated,
+      duplicates: persist.duplicates,
+      status: errorMessage ? (jobs.length > 0 ? 'partial' : 'failed') : 'success',
+      ...(errorMessage !== undefined && { errorMessage }),
+    };
+
+    await this.scrapeLogRepo.create(stats);
+    logger.info({ ...stats }, 'LinkedIn scrape run logged');
+    return stats;
   }
 
   private async scrapeMany(registrations: ScraperRegistration[]): Promise<ScrapeRunStats[]> {
@@ -125,5 +163,6 @@ export class ScrapeService {
   async shutdown(): Promise<void> {
     await this.pagePool.drain();
     await BrowserManager.getInstance().close();
+    await closeLinkedInBrowser();
   }
 }

@@ -17,10 +17,12 @@ export const config = {
   linkedinMaxJobs: Number(process.env.LINKEDIN_MAX_JOBS ?? 150),
   linkedinDelayMs: Number(process.env.LINKEDIN_DELAY_MS ?? 2_000),
   linkedinScrollRounds: Number(process.env.LINKEDIN_SCROLL_ROUNDS ?? 8),
-  linkedinDetailFetchLimit: Number(process.env.LINKEDIN_DETAIL_FETCH_LIMIT ?? 0),
+  linkedinDetailFetchLimit: Number(process.env.LINKEDIN_DETAIL_FETCH_LIMIT ?? 100),
   linkedinPageTimeoutMs: Number(process.env.LINKEDIN_PAGE_TIMEOUT_MS ?? 25_000),
   linkedinMaxPages: Number(process.env.LINKEDIN_MAX_PAGES ?? 10),
   linkedinFast: process.env.LINKEDIN_FAST === 'true',
+  detailFetchLimit: Number(process.env.DETAIL_FETCH_LIMIT ?? 500),
+  detailFetchDelayMs: Number(process.env.DETAIL_FETCH_DELAY_MS ?? 400),
 } as const;
 
 export type ScrapeCategory =

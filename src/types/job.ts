@@ -14,6 +14,23 @@ export interface Job {
   publishedAt?: Date;
   expiresAt?: Date;
   tags: string[];
+  rawHtml?: string;
+  extractionMetadata?: Record<string, unknown>;
+  experienceLevel?: string;
+  experienceYears?: string;
+  educationLevel?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
+  salaryPeriod?: string;
+  salaryNet?: boolean;
+  qualityScore?: number;
+  descriptionScore?: number;
+}
+
+export interface EnrichedJob extends Job {
+  region?: string;
+  canonicalCity?: string;
 }
 
 export interface ScrapeResult {
@@ -42,4 +59,20 @@ export interface ScrapeRunStats {
   duplicates: number;
   status: 'success' | 'partial' | 'failed';
   errorMessage?: string;
+}
+
+export interface JobSkillInput {
+  name: string;
+  slug: string;
+  category?: string;
+  confidence: number;
+}
+
+export interface CompanyEnrichmentInput {
+  websiteUrl?: string;
+  logoUrl?: string;
+  industry?: string;
+  size?: string;
+  careerPageUrl?: string;
+  linkedinUrl?: string;
 }

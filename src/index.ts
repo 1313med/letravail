@@ -7,8 +7,14 @@ import { enqueueAllCategories, enqueueCategoryScrape } from './queues/queues.js'
 import { runSchedulerOnce, startScheduler } from './scheduler/index.js';
 
 async function main(): Promise<void> {
-  const [command, ...args] = process.argv.slice(2);
+  let [command, ...args] = process.argv.slice(2);
   const container = getContainer();
+
+  // Shorthand: `npm run scrape cih-bank` → scrape cih-bank
+  if (command && !['scrape', 'enqueue', 'scheduler', 'list'].includes(command)) {
+    args = [command, ...args];
+    command = 'scrape';
+  }
 
   try {
     switch (command) {
@@ -110,12 +116,13 @@ function printUsage(): void {
 letravail-scraper
 
 Usage:
-  npm run scrape -- scrape [--all | <category> | <source>]
+  npm run scrape -- [scrape] [--all | <category> | <source>]
   npm run scrape -- enqueue [--all | <category>]
   npm run scrape -- scheduler [--once] [--6h | --daily]
   npm run scrape -- list
 
 Examples:
+  npm run scrape cih-bank
   npm run scrape -- scrape linkedin
   npm run scrape -- scrape attijariwafa-bank
   npm run scrape -- scrape banks

@@ -3,6 +3,7 @@ import { CompanyRepository } from './repositories/company.repository.js';
 import { JobRepository } from './repositories/job.repository.js';
 import { LocationRepository } from './repositories/location.repository.js';
 import { ScrapeLogRepository } from './repositories/scrape-log.repository.js';
+import { SkillRepository } from './repositories/skill.repository.js';
 import { TagRepository } from './repositories/tag.repository.js';
 import { ScrapeService } from './services/scrape.service.js';
 import { PagePool } from './lib/browser/page-pool.js';
@@ -20,7 +21,8 @@ export function createContainer(): Container {
   const companyRepo = new CompanyRepository(db);
   const locationRepo = new LocationRepository(db);
   const tagRepo = new TagRepository(db);
-  const jobRepo = new JobRepository(db, companyRepo, locationRepo, tagRepo);
+  const skillRepo = new SkillRepository(db);
+  const jobRepo = new JobRepository(db, companyRepo, locationRepo, tagRepo, skillRepo);
   const scrapeLogRepo = new ScrapeLogRepository(db);
   const pagePool = new PagePool();
 

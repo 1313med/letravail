@@ -1,6 +1,9 @@
 import type { Page } from 'playwright';
+import { config } from '../../config/index.js';
 import type { Job } from '../../types/job.js';
+import { htmlToDescription } from '../../enrichment/job-enrichment.service.js';
 import { BaseScraper } from '../base.scraper.js';
+import { fetchAttijariwafaJobDetail } from '../detail-fetchers.js';
 import { parseFrenchDate } from '../helpers.js';
 
 const CAREERS_URL =
@@ -75,7 +78,47 @@ export class AttijariwafaScraper extends BaseScraper {
         requisitions = await this.parseDomFallback(page);
       }
 
-      return requisitions.map((req) => this.toJob(req));
+      const jobs: Job[] = [];
+      const limit = Math.min(requisitions.length, config.detailFetchLimit);
+
+      for (let i = 0; i < requisitions.length; i++) {
+        const req = requisitions[i]!;
+        let description = req.externalDescription
+          ? htmlToDescription(req.externalDescription)
+          : req.displayJobTitle;
+        let rawHtml = req.externalDescription;
+        let city = req.locations?.[0]?.city ?? req.locations?.[0]?.locationName ?? 'Casablanca';
+
+        if (i < limit && (!req.externalDescription || description.length < 200)) {
+          try {
+            const detail = await fetchAttijariwafaJobDetail(page, String(req.requisitionId));
+            if (detail.description && detail.description.length > description.length) {
+              description = detail.description;
+              rawHtml = detail.rawHtml ?? rawHtml;
+            }
+            if (detail.city) city = detail.city;
+            await page.waitForTimeout(config.detailFetchDelayMs);
+          } catch {
+            /* keep list data */
+          }
+        }
+
+        jobs.push(
+          this.normalize({
+            sourceJobId: String(req.requisitionId),
+            title: req.displayJobTitle,
+            city,
+            description,
+            rawHtml,
+            applicationUrl: `${JOB_DETAIL_BASE}/${req.requisitionId}?c=attijariwafabank&lang=fr-FR`,
+            publishedAt: parseFrenchDate(req.postingEffectiveDate ?? ''),
+            expiresAt: parseFrenchDate(req.postingExpirationDate ?? ''),
+            tags: ['banks', 'finance', 'attijariwafa'],
+          }),
+        );
+      }
+
+      return jobs;
     });
   }
 
@@ -145,26 +188,9 @@ export class AttijariwafaScraper extends BaseScraper {
         return [{
           requisitionId,
           displayJobTitle: title,
-          externalDescription: title,
           locations: [{ country: 'MA' }],
         }];
       });
-    });
-  }
-
-  private toJob(req: CsodRequisition): Job {
-    const location = req.locations?.[0];
-    const city = location?.city ?? location?.locationName ?? 'Casablanca';
-
-    return this.normalize({
-      sourceJobId: String(req.requisitionId),
-      title: req.displayJobTitle,
-      city,
-      description: req.externalDescription ?? req.displayJobTitle,
-      applicationUrl: `${JOB_DETAIL_BASE}/${req.requisitionId}?c=attijariwafabank&lang=fr-FR`,
-      publishedAt: parseFrenchDate(req.postingEffectiveDate ?? ''),
-      expiresAt: parseFrenchDate(req.postingExpirationDate ?? ''),
-      tags: ['banks', 'finance', 'attijariwafa'],
     });
   }
 }

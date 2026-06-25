@@ -8,6 +8,7 @@ import type { ScrapeLogRepository } from '../repositories/scrape-log.repository.
 import { closeLinkedInBrowser } from '../scrapers/linkedin/session.js';
 import type { BaseScraper } from '../scrapers/base.scraper.js';
 import type { Job, PersistResult, ScrapeRunStats } from '../types/job.js';
+import { enrichAndPrepare } from './enrichment.service.js';
 
 export type ScraperFactory = (pagePool: PagePool) => BaseScraper;
 
@@ -58,7 +59,7 @@ export class ScrapeService {
 
     try {
       jobs = await scraper.run();
-      persist = await this.jobRepo.upsertMany(jobs);
+      persist = await this.persistEnriched(jobs);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ err: error, source: 'linkedin' }, 'LinkedIn scraper failed');
@@ -114,7 +115,7 @@ export class ScrapeService {
 
     try {
       jobs = await scraper.run();
-      persist = await this.jobRepo.upsertMany(jobs);
+      persist = await this.persistEnriched(jobs);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
@@ -158,6 +159,17 @@ export class ScrapeService {
     );
 
     return stats;
+  }
+
+  private async persistEnriched(jobs: Job[]): Promise<PersistResult> {
+    const enriched = enrichAndPrepare(jobs);
+    return this.jobRepo.upsertEnrichedMany(
+      enriched.map((e) => ({
+        job: e.job,
+        skills: e.skills,
+        companyEnrichment: e.companyEnrichment,
+      })),
+    );
   }
 
   async shutdown(): Promise<void> {

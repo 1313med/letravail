@@ -1,9 +1,12 @@
 import type { Page } from 'playwright';
 import type { ScrapeCategory } from '../config/index.js';
+import { config } from '../config/index.js';
 import type { PagePool } from '../lib/browser/page-pool.js';
 import type { Job } from '../types/job.js';
+import { mergeDetailContent } from '../enrichment/job-enrichment.service.js';
 import { normalizeJobTextFields } from '../utils/cleaning.js';
 import { filterJobCandidates } from '../utils/job-filters.js';
+import { fetchGenericJobDetail } from './detail-fetchers.js';
 import { waitForAnySelector } from './helpers.js';
 
 export interface GenericScraperConfig {
@@ -13,19 +16,25 @@ export interface GenericScraperConfig {
   urls: string[];
   tags: string[];
   defaultCity?: string;
+  fetchDetails?: boolean;
 }
 
-export function createGenericScraper(config: GenericScraperConfig) {
+export function createGenericScraper(scraperConfig: GenericScraperConfig) {
   return {
     async scrapeWithPool(pagePool: PagePool): Promise<Job[]> {
       const page = await pagePool.acquire();
       try {
-        for (const url of config.urls) {
+        for (const url of scraperConfig.urls) {
           try {
             await page.goto(url, { waitUntil: 'domcontentloaded' });
             await waitForAnySelector(page, ['body'], 5_000);
-            const jobs = await extractJobsFromPage(page, config);
-            if (jobs.length > 0) return jobs;
+            let jobs = await extractJobsFromPage(page, scraperConfig);
+            if (jobs.length > 0) {
+              if (scraperConfig.fetchDetails !== false) {
+                jobs = await enrichWithDetails(page, jobs);
+              }
+              return jobs;
+            }
           } catch {
             continue;
           }
@@ -38,7 +47,29 @@ export function createGenericScraper(config: GenericScraperConfig) {
   };
 }
 
-async function extractJobsFromPage(page: Page, config: GenericScraperConfig): Promise<Job[]> {
+async function enrichWithDetails(page: Page, jobs: Job[]): Promise<Job[]> {
+  const limit = Math.min(jobs.length, config.detailFetchLimit);
+  const enriched: Job[] = [];
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i]!;
+    if (i < limit && job.applicationUrl) {
+      try {
+        const detail = await fetchGenericJobDetail(page, job.applicationUrl);
+        enriched.push(mergeDetailContent(job, detail));
+        await page.waitForTimeout(config.detailFetchDelayMs);
+      } catch {
+        enriched.push(job);
+      }
+    } else {
+      enriched.push(job);
+    }
+  }
+
+  return enriched;
+}
+
+async function extractJobsFromPage(page: Page, scraperConfig: GenericScraperConfig): Promise<Job[]> {
   const baseUrl = page.url();
   const raw = await page.evaluate(
     ({ companyName, defaultCity, base }) => {
@@ -83,20 +114,20 @@ async function extractJobsFromPage(page: Page, config: GenericScraperConfig): Pr
       void companyName;
       return results;
     },
-    { companyName: config.companyName, defaultCity: config.defaultCity ?? 'Casablanca', base: baseUrl },
+    { companyName: scraperConfig.companyName, defaultCity: scraperConfig.defaultCity ?? 'Casablanca', base: baseUrl },
   );
 
   return filterJobCandidates(raw).map((item) =>
     normalizeJobTextFields({
-      source: config.sourceName,
+      source: scraperConfig.sourceName,
       sourceJobId: item.sourceJobId,
       title: item.title,
-      company: config.companyName,
+      company: scraperConfig.companyName,
       city: item.city,
       country: 'Morocco',
       description: item.description,
       applicationUrl: item.applicationUrl,
-      tags: config.tags,
+      tags: scraperConfig.tags,
     }),
   );
 }

@@ -1,9 +1,22 @@
 import type { Page } from 'playwright';
+import { config } from '../../config/index.js';
 import type { Job } from '../../types/job.js';
+import { mergeDetailContent } from '../../enrichment/job-enrichment.service.js';
 import { BaseScraper } from '../base.scraper.js';
+import { fetchCihJobDetail } from '../detail-fetchers.js';
 import { parseFrenchDate } from '../helpers.js';
 
 const LISTING_URL = 'https://recrutement.cihbank.ma/front-offres.html?direct';
+
+interface CihListing {
+  sourceJobId: string;
+  title: string;
+  city?: string;
+  applicationUrl: string;
+  description?: string;
+  contractType?: string;
+  publishedAt?: Date;
+}
 
 export class CihScraper extends BaseScraper {
   readonly sourceName = 'cih-bank';
@@ -13,7 +26,8 @@ export class CihScraper extends BaseScraper {
   async scrape(): Promise<Job[]> {
     return this.withPage(async (page) => {
       const listings = await this.scrapeAllPages(page);
-      return listings.map((listing) =>
+      const enriched = await this.enrichWithDetails(page, listings);
+      return enriched.map((listing) =>
         this.normalize({
           sourceJobId: listing.sourceJobId,
           title: listing.title,
@@ -22,30 +36,58 @@ export class CihScraper extends BaseScraper {
           applicationUrl: listing.applicationUrl,
           contractType: listing.contractType,
           publishedAt: listing.publishedAt,
+          rawHtml: listing.rawHtml,
           tags: ['banks', 'finance', 'cih'],
         }),
       );
     });
   }
 
-  private async scrapeAllPages(page: Page): Promise<Array<{
-    sourceJobId: string;
-    title: string;
-    city?: string;
-    applicationUrl: string;
-    description?: string;
-    contractType?: string;
-    publishedAt?: Date;
-  }>> {
-    const collected = new Map<string, {
-      sourceJobId: string;
-      title: string;
-      city?: string;
-      applicationUrl: string;
-      description?: string;
-      contractType?: string;
-      publishedAt?: Date;
-    }>();
+  private async enrichWithDetails(page: Page, listings: CihListing[]): Promise<Array<CihListing & { rawHtml?: string }>> {
+    const limit = Math.min(listings.length, config.detailFetchLimit);
+    const results: Array<CihListing & { rawHtml?: string }> = [];
+
+    for (let i = 0; i < listings.length; i++) {
+      const listing = listings[i]!;
+      if (i < limit) {
+        try {
+          const detail = await fetchCihJobDetail(page, listing.applicationUrl);
+          const merged = mergeDetailContent(
+            {
+              source: this.sourceName,
+              sourceJobId: listing.sourceJobId,
+              title: listing.title,
+              company: this.companyName,
+              city: listing.city ?? 'Casablanca',
+              country: 'Morocco',
+              description: listing.description ?? listing.title,
+              applicationUrl: listing.applicationUrl,
+              contractType: listing.contractType,
+              tags: [],
+            },
+            detail,
+          );
+          results.push({
+            ...listing,
+            description: merged.description,
+            contractType: merged.contractType ?? listing.contractType,
+            city: merged.city ?? listing.city,
+            rawHtml: detail.rawHtml,
+          });
+          await page.waitForTimeout(config.detailFetchDelayMs);
+        } catch {
+          results.push(listing);
+        }
+      } else {
+        results.push(listing);
+      }
+    }
+
+    return results;
+  }
+
+  private async scrapeAllPages(page: Page): Promise<CihListing[]> {
+    const collected = new Map<string, CihListing>();
 
     await page.goto(LISTING_URL, { waitUntil: 'domcontentloaded' });
     let pageIndex = 0;
@@ -105,7 +147,6 @@ export class CihScraper extends BaseScraper {
           title,
           city: cityMatch?.[0],
           applicationUrl: href,
-          description: title,
           contractType: contractMatch?.[1],
           publishedAt: dateMatch?.[1],
         });

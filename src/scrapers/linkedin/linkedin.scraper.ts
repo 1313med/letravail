@@ -22,6 +22,7 @@ interface RawLinkedInJob {
   city: string;
   applicationUrl: string;
   description: string;
+  rawHtml?: string;
 }
 
 type SearchUrlBuilder = (start: number) => string;
@@ -274,7 +275,7 @@ export class LinkedInScraper {
   private async fetchJobDetail(
     page: Page,
     jobId: string,
-  ): Promise<Pick<RawLinkedInJob, 'title' | 'company' | 'city' | 'description'>> {
+  ): Promise<Pick<RawLinkedInJob, 'title' | 'company' | 'city' | 'description' | 'rawHtml'>> {
     await page.goto(buildLinkedInJobUrl(jobId), {
       waitUntil: 'domcontentloaded',
       timeout: config.linkedinPageTimeoutMs,
@@ -302,7 +303,12 @@ export class LinkedInScraper {
           '.jobs-description__content, .jobs-box__html-content, #job-details',
         )?.textContent?.trim() ?? '';
 
-      return { title, company, city, description };
+      const rawHtml =
+        document.querySelector(
+          '.jobs-description__content, .jobs-box__html-content, #job-details',
+        )?.innerHTML ?? '';
+
+      return { title, company, city, description, rawHtml };
     });
   }
 
@@ -317,6 +323,7 @@ export class LinkedInScraper {
       country: 'Morocco',
       description: raw.description || raw.title,
       applicationUrl: raw.applicationUrl,
+      rawHtml: raw.rawHtml,
       tags: ['linkedin', 'morocco', city.toLowerCase().replace(/\s+/g, '-')],
     };
   }

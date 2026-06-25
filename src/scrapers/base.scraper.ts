@@ -69,6 +69,7 @@ export abstract class BaseScraper {
       ...(raw.remote !== undefined && { remote: raw.remote }),
       ...(raw.publishedAt !== undefined && { publishedAt: raw.publishedAt }),
       ...(raw.expiresAt !== undefined && { expiresAt: raw.expiresAt }),
+      ...(raw.rawHtml !== undefined && { rawHtml: raw.rawHtml }),
     };
 
     return normalizeJobTextFields(base);

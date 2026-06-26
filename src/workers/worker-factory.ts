@@ -11,6 +11,7 @@ const connection: ConnectionOptions = {
 
 export interface ScrapeJobData {
   category: ScrapeCategory;
+  sourceName?: string;
 }
 
 export function createCategoryWorker(queueName: string, category: ScrapeCategory): Worker {
@@ -19,7 +20,17 @@ export function createCategoryWorker(queueName: string, category: ScrapeCategory
   const worker = new Worker<ScrapeJobData>(
     queueName,
     async (job: Job<ScrapeJobData>) => {
-      logger.info({ queue: queueName, category, jobId: job.id }, 'Worker processing job');
+      logger.info({ queue: queueName, category, sourceName: job.data.sourceName, jobId: job.id }, 'Worker processing job');
+
+      if (job.data.sourceName) {
+        if (job.data.sourceName === 'linkedin') {
+          const stat = await container.scrapeService.scrapeLinkedIn();
+          return { processed: 1, success: stat.status === 'success' ? 1 : 0, failed: stat.status === 'failed' ? 1 : 0 };
+        }
+        const stat = await container.scrapeService.scrapeSource(job.data.sourceName);
+        return { processed: 1, success: stat.status === 'success' ? 1 : 0, failed: stat.status === 'failed' ? 1 : 0 };
+      }
+
       const stats = await container.scrapeService.scrapeCategory(category);
       return {
         processed: stats.length,

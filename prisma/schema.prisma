@@ -27,6 +27,16 @@ model Job {
   applicationUrl String
   publishedAt    DateTime?
   expiresAt      DateTime?
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  lastVerifiedAt DateTime?
+  lastModifiedAt DateTime?
+  sourcePublishedAt DateTime?
+  crawlCount     Int       @default(0)
+  isActive       Boolean   @default(true)
+  archivedAt     DateTime?
+  validationStatus String? @default("valid")
+  validationFlags  String[] @default([])
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -43,6 +53,7 @@ model Job {
   salaryNet          Boolean?
   qualityScore       Float?
   descriptionScore   Float?
+  contentHash        String?
 
   companyId  String?
   locationId String?
@@ -50,6 +61,7 @@ model Job {
   location   Location? @relation(fields: [locationId], references: [id])
   tags       JobTag[]
   skills     JobSkill[]
+  versions   JobVersion[]
 
   @@unique([source, sourceJobId])
   @@index([slug])
@@ -62,7 +74,27 @@ model Job {
   @@index([experienceLevel])
   @@index([educationLevel])
   @@index([qualityScore])
+  @@index([lastSeenAt])
+  @@index([isActive, publishedAt])
+  @@index([contentHash])
+  @@index([isActive, lastSeenAt])
   @@map("jobs")
+}
+
+model JobVersion {
+  id           String   @id @default(cuid())
+  jobId        String
+  contentHash  String
+  title        String
+  description  String   @db.Text
+  requirements String?  @db.Text
+  rawHtml      String?  @db.Text
+  capturedAt   DateTime @default(now())
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([contentHash])
+  @@map("job_versions")
 }
 
 model Company {
@@ -75,13 +107,76 @@ model Company {
   size          String?
   careerPageUrl String?
   linkedinUrl   String?
+  headquartersCity String?
+  sector        String?
+  description   String?   @db.Text
+  canonicalName String?
+  resolutionConfidence Float?
+  ownershipType String?
+  foundedYear   Int?
+  moroccanOffices String[] @default([])
+  firstSeenAt   DateTime?
+  lastCrawlAt   DateTime?
+  activeJobCount Int       @default(0)
+  archivedJobCount Int     @default(0)
+  hiringFrequency String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   jobs          Job[]
+  aliases       CompanyAlias[]
 
   @@index([slug])
   @@index([name])
+  @@index([canonicalName])
   @@map("companies")
+}
+
+model CompanyAlias {
+  id         String   @id @default(cuid())
+  alias      String   @unique
+  companyId  String
+  confidence Float    @default(1)
+  isManual   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_aliases")
+}
+
+model SourceProfile {
+  id                   String    @id @default(cuid())
+  sourceName           String    @unique
+  category             String
+  companyName          String
+  status               String    @default("active")
+  crawlIntervalMinutes Int       @default(360)
+  lastCrawlAt          DateTime?
+  nextCrawlAt          DateTime?
+  atsPlatform          String?
+  careerPageUrl        String?
+  intelligenceScore    Float?
+  freshnessScore       Float?
+  jobsDiscovered       Int       @default(0)
+  activeJobs           Int       @default(0)
+  archivedJobs         Int       @default(0)
+  avgDescriptionLength Int?
+  skillCoverage        Float?
+  experienceCoverage   Float?
+  avgCrawlDurationMs   Int?
+  failureRate          Float?
+  duplicateRate        Float?
+  avgDailyAdditions    Float?
+  avgDailyRemovals     Float?
+  lastValidationReport Json?
+  metadata             Json?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([status])
+  @@index([nextCrawlAt])
+  @@index([intelligenceScore])
+  @@map("source_profiles")
 }
 
 model Location {

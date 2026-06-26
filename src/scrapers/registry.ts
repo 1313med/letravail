@@ -4,6 +4,26 @@ import { AttijariwafaScraper } from './banks/attijariwafa.scraper.js';
 import { BoaScraper } from './banks/boa.scraper.js';
 import { BmciScraper } from './banks/bmci.scraper.js';
 import { CihScraper } from './banks/cih.scraper.js';
+import {
+  BanquePopulaireScraper,
+  CreditDuMarocScraper,
+  CreditAgricoleScraper,
+  SocieteGeneraleScraper,
+  CfgBankScraper,
+  AlBaridBankScraper,
+  AccentureScraper,
+  DeloitteScraper,
+  OcpGroupScraper,
+  OncfScraper,
+  DecathlonScraper,
+  IkeaScraper,
+  PwcScraper,
+  EyScraper,
+  KpmgScraper,
+  ManagemScraper,
+  DhlScraper,
+  OneeScraper,
+} from './employers/ats-employer.scraper.js';
 import { RamScraper } from './airlines/ram.scraper.js';
 import { AutohallScraper, RenaultScraper, StellantisScraper } from './automotive/index.js';
 import {
@@ -18,6 +38,18 @@ import { BimScraper, LabelvieScraper, MarjaneScraper } from './retail/index.js';
 import { InwiScraper, MarocTelecomScraper, OrangeScraper } from './telecom/index.js';
 import { CapgeminiScraper, CgiScraper, DxcScraper } from './technology/index.js';
 import { CadiAyyadScraper, HassanIIScraper, MohammedVScraper } from './universities/index.js';
+import {
+  IntelciaScraper,
+  TeleperformanceScraper,
+  FoundeverScraper,
+  ConcentrixScraper,
+  WebhelpScraper,
+  ComdataScraper,
+  MajorelScraper,
+  OutsourciaScraper,
+  XceedScraper,
+  AdmValueScraper,
+} from './bpo/index.js';
 import type { ScraperRegistration } from '../services/scrape.service.js';
 
 type ScraperCtor = new (pagePool?: PagePool) => import('./base.scraper.js').BaseScraper;
@@ -38,6 +70,12 @@ function register(
 export const scraperRegistry: ScraperRegistration[] = [
   register(AttijariwafaScraper),
   register(CihScraper),
+  register(BanquePopulaireScraper),
+  register(CreditDuMarocScraper),
+  register(CreditAgricoleScraper),
+  register(SocieteGeneraleScraper),
+  register(CfgBankScraper),
+  register(AlBaridBankScraper),
   register(BoaScraper),
   register(BmciScraper),
   register(InwiScraper),
@@ -53,6 +91,19 @@ export const scraperRegistry: ScraperRegistration[] = [
   register(CapgeminiScraper),
   register(CgiScraper),
   register(DxcScraper),
+  register(AccentureScraper),
+  register(DeloitteScraper),
+  register(OcpGroupScraper),
+  register(OncfScraper),
+  register(DecathlonScraper),
+  register(IkeaScraper),
+  register(PwcScraper),
+  register(EyScraper),
+  register(KpmgScraper),
+  register(ManagemScraper),
+  register(DhlScraper),
+  register(AdmValueScraper),
+  register(OneeScraper),
   register(AnapecScraper),
   register(EmploiPublicScraper),
   register(MinistereSanteScraper),
@@ -62,6 +113,15 @@ export const scraperRegistry: ScraperRegistration[] = [
   register(MohammedVScraper, 'daily'),
   register(HassanIIScraper, 'daily'),
   register(CadiAyyadScraper, 'daily'),
+  register(IntelciaScraper),
+  register(TeleperformanceScraper),
+  register(FoundeverScraper),
+  register(ConcentrixScraper),
+  register(WebhelpScraper),
+  register(ComdataScraper),
+  register(MajorelScraper),
+  register(OutsourciaScraper),
+  register(XceedScraper),
 ];
 
 export function getSourcesByCategory(category: ScrapeCategory): string[] {

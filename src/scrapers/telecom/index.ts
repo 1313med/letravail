@@ -15,7 +15,7 @@ export class InwiScraper extends BaseScraper {
       sourceName: 'inwi',
       companyName: 'Inwi',
       category: 'telecom',
-      urls: ['https://www.inwi.ma/fr/carrieres', 'https://carrieres.inwi.ma'],
+      urls: ['https://inwi.ma/fr/carrieres', 'https://carrieres.inwi.ma'],
       tags: ['telecom', 'inwi'],
     });
   }
@@ -37,7 +37,10 @@ export class MarocTelecomScraper extends BaseScraper {
       sourceName: 'maroc-telecom',
       companyName: 'Maroc Telecom',
       category: 'telecom',
-      urls: ['https://www.iam.ma/carrieres', 'https://www.maroctelecom.ma/carrieres'],
+      urls: [
+        'https://www.iam.ma/groupe-iam/carrieres',
+        'https://www.maroctelecom.ma/carrieres',
+      ],
       tags: ['telecom', 'iam'],
     });
   }
@@ -59,7 +62,10 @@ export class OrangeScraper extends BaseScraper {
       sourceName: 'orange-maroc',
       companyName: 'Orange Maroc',
       category: 'telecom',
-      urls: ['https://www.orange.ma/fr/carrieres', 'https://jobs.orange.com/fr'],
+      urls: [
+        'https://www.orange.ma/fr/orange-carrieres',
+        'https://orange.jobs/fr_FR/home',
+      ],
       tags: ['telecom', 'orange'],
     });
   }

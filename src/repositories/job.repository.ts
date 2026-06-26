@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { EnrichedJob, Job, JobSkillInput, CompanyEnrichmentInput } from '../types/job.js';
 import { generateJobHash } from '../utils/hash.js';
+import { generateContentHash } from '../utils/content-hash.js';
 import { generateJobSlug, slugifyEntity } from '../utils/slug.js';
 import type { CompanyRepository } from './company.repository.js';
 import type { LocationRepository } from './location.repository.js';
@@ -68,12 +69,44 @@ export class JobRepository {
       const allSkills = [...skills];
       const skillIdMap = await this.skillRepo.upsertMany(allSkills);
       const data = this.buildJobFields(job, safeHash, slug, companyId, locationId);
+      const contentHash = generateContentHash(job.title, job.description, job.requirements);
+      const dataWithHash = { ...data, contentHash };
 
       let jobId: string;
 
       if (existing) {
         duplicates++;
-        await this.db.job.update({ where: { id: existing.id }, data });
+        const now = new Date();
+        const contentChanged = existing.contentHash !== contentHash;
+
+        if (contentChanged && existing.contentHash) {
+          await this.db.jobVersion.create({
+            data: {
+              jobId: existing.id,
+              contentHash: existing.contentHash,
+              title: existing.title,
+              description: existing.description,
+              requirements: existing.requirements,
+              rawHtml: existing.rawHtml,
+            },
+          });
+        }
+
+        await this.db.job.update({
+          where: { id: existing.id },
+          data: {
+            ...dataWithHash,
+            lastSeenAt: now,
+            lastVerifiedAt: now,
+            ...(contentChanged ? { lastModifiedAt: now } : {}),
+            sourcePublishedAt: job.sourcePublishedAt ?? job.publishedAt,
+            crawlCount: { increment: 1 },
+            isActive: true,
+            archivedAt: null,
+            validationStatus: job.validationStatus,
+            validationFlags: job.validationFlags ?? [],
+          },
+        });
         jobId = existing.id;
         updated++;
 
@@ -83,9 +116,19 @@ export class JobRepository {
         });
       } else {
         try {
+          const now = new Date();
           const created = await this.db.job.create({
             data: {
-              ...data,
+              ...dataWithHash,
+              firstSeenAt: now,
+              lastSeenAt: now,
+              lastVerifiedAt: now,
+              lastModifiedAt: now,
+              sourcePublishedAt: job.sourcePublishedAt ?? job.publishedAt,
+              crawlCount: 1,
+              isActive: true,
+              validationStatus: job.validationStatus ?? 'valid',
+              validationFlags: job.validationFlags ?? [],
               tags: {
                 create: [...tagMap.values()].map((tagId) => ({ tagId })),
               },
@@ -104,7 +147,21 @@ export class JobRepository {
           if (!bySource) throw error;
 
           duplicates++;
-          await this.db.job.update({ where: { id: bySource.id }, data });
+          const now = new Date();
+          await this.db.job.update({
+            where: { id: bySource.id },
+            data: {
+              ...dataWithHash,
+              lastSeenAt: now,
+              lastVerifiedAt: now,
+              lastModifiedAt: bySource.contentHash !== contentHash ? now : bySource.lastModifiedAt,
+              crawlCount: { increment: 1 },
+              isActive: true,
+              archivedAt: null,
+              validationStatus: job.validationStatus,
+              validationFlags: job.validationFlags ?? [],
+            },
+          });
           jobId = bySource.id;
           updated++;
 
@@ -169,6 +226,7 @@ export class JobRepository {
       salaryNet: job.salaryNet,
       qualityScore: job.qualityScore,
       descriptionScore: job.descriptionScore,
+      contentHash: job.contentHash,
       companyId,
       locationId,
     };
@@ -198,6 +256,45 @@ export class JobRepository {
         ...data,
       },
     });
+  }
+
+  /** Mark jobs from a source not seen in the latest scrape as inactive */
+  async markStaleInactive(source: string, seenSourceJobIds: string[]): Promise<number> {
+    const result = await this.db.job.updateMany({
+      where: {
+        source,
+        sourceJobId: { notIn: seenSourceJobIds },
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        archivedAt: new Date(),
+      },
+    });
+    return result.count;
+  }
+
+  /** Deactivate jobs past their expiration date */
+  async deactivateExpired(): Promise<number> {
+    const result = await this.db.job.updateMany({
+      where: { isActive: true, expiresAt: { lt: new Date() } },
+      data: { isActive: false, archivedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  /** Archive jobs not verified within threshold days */
+  async archiveUnverified(source: string, daysSinceVerified = 21): Promise<number> {
+    const cutoff = new Date(Date.now() - daysSinceVerified * 86_400_000);
+    const result = await this.db.job.updateMany({
+      where: {
+        source,
+        isActive: true,
+        lastVerifiedAt: { lt: cutoff },
+      },
+      data: { isActive: false, archivedAt: new Date() },
+    });
+    return result.count;
   }
 }
 

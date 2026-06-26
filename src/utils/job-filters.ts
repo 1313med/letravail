@@ -43,7 +43,8 @@ const NON_JOB_URL_PATTERNS = [
 ];
 
 const JOB_URL_PATTERNS = [
-  /offre-emploi/i,
+  /offre-de-emploi\/emploi-/i,
+  /talent-soft\.com\/offre-de-emploi/i,
   /\/requisition\/\d+/i,
   /\/jobs?\//i,
   /\/job\//i,

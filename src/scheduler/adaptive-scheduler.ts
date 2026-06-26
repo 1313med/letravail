@@ -1,0 +1,51 @@
+import { CronJob } from 'cron';
+import { logger } from '../lib/logger.js';
+import { getContainer } from '../container.js';
+import { enqueueSourceScrape, enqueueLinkedInScrape } from '../queues/queues.js';
+import { isSourceDue } from '../platform/crawl-schedule.js';
+
+const jobs: CronJob[] = [];
+
+/**
+ * Adaptive scheduler — checks every minute which sources are due for crawl.
+ * Replaces fixed 6h/daily schedules with per-source intelligence-driven intervals.
+ */
+export function startAdaptiveScheduler(): void {
+  const tick = new CronJob('* * * * *', () => {
+    runAdaptiveTick().catch((err) => logger.error({ err }, 'Adaptive scheduler tick failed'));
+  });
+  tick.start();
+  jobs.push(tick);
+
+  logger.info('Adaptive scheduler started (checks every minute)');
+}
+
+export async function runAdaptiveTick(): Promise<void> {
+  const { sourceProfileRepo } = getContainer();
+  await sourceProfileRepo.syncFromRegistry(getContainer().scrapeService.getRegistry());
+
+  const due = await sourceProfileRepo.getDueSources();
+
+  for (const { sourceName, category } of due) {
+    const profile = await sourceProfileRepo.getProfile(sourceName);
+    if (!profile) continue;
+
+    if (!isSourceDue(profile.lastCrawlAt, profile.crawlIntervalMinutes)) continue;
+
+    logger.info(
+      { source: sourceName, interval: profile.crawlIntervalMinutes },
+      'Enqueueing adaptive crawl',
+    );
+
+    if (sourceName === 'linkedin') {
+      await enqueueLinkedInScrape();
+    } else {
+      await enqueueSourceScrape(sourceName, category);
+    }
+  }
+}
+
+export function stopAdaptiveScheduler(): void {
+  for (const job of jobs) job.stop();
+  jobs.length = 0;
+}

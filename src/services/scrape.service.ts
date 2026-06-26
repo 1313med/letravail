@@ -5,10 +5,16 @@ import type { PagePool } from '../lib/browser/page-pool.js';
 import { logger } from '../lib/logger.js';
 import type { JobRepository } from '../repositories/job.repository.js';
 import type { ScrapeLogRepository } from '../repositories/scrape-log.repository.js';
+import type { SourceProfileRepository } from '../repositories/source-profile.repository.js';
+import { validateJobBatch } from '../platform/job-validator.js';
+import { buildCrawlValidationReport } from '../platform/crawl-validation.js';
 import { closeLinkedInBrowser } from '../scrapers/linkedin/session.js';
 import type { BaseScraper } from '../scrapers/base.scraper.js';
 import type { Job, PersistResult, ScrapeRunStats } from '../types/job.js';
 import { enrichAndPrepare } from './enrichment.service.js';
+import { getPrisma } from '../lib/prisma.js';
+import { mergeDuplicateJobs } from '../platform/duplicate-merger.js';
+import { rankJobsByFreshness } from '../platform/job-ranker.js';
 
 export type ScraperFactory = (pagePool: PagePool) => BaseScraper;
 
@@ -23,6 +29,7 @@ export class ScrapeService {
   constructor(
     private readonly jobRepo: JobRepository,
     private readonly scrapeLogRepo: ScrapeLogRepository,
+    private readonly sourceProfileRepo: SourceProfileRepository,
     private readonly registry: ScraperRegistration[],
     private readonly pagePool: PagePool,
   ) {}
@@ -56,10 +63,18 @@ export class ScrapeService {
     let jobs: Job[] = [];
     let persist: PersistResult = { inserted: 0, updated: 0, duplicates: 0 };
     let errorMessage: string | undefined;
+    let validationReport: Record<string, unknown> | undefined;
 
     try {
       jobs = await scraper.run();
-      persist = await this.persistEnriched(jobs);
+      const result = await this.persistEnriched(jobs, 'linkedin');
+      persist = result.persist;
+      validationReport = result.validationReport;
+      const expired = await this.jobRepo.deactivateExpired();
+      const unverified = await this.jobRepo.archiveUnverified('linkedin', 14);
+      if (expired > 0 || unverified > 0) {
+        logger.info({ expired, unverified }, 'LinkedIn expiry sweep');
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ err: error, source: 'linkedin' }, 'LinkedIn scraper failed');
@@ -81,6 +96,7 @@ export class ScrapeService {
     };
 
     await this.scrapeLogRepo.create(stats);
+    await this.sourceProfileRepo.recordCrawlComplete('linkedin', stats, validationReport);
     logger.info({ ...stats }, 'LinkedIn scrape run logged');
     return stats;
   }
@@ -112,10 +128,13 @@ export class ScrapeService {
     let jobs: Job[] = [];
     let persist: PersistResult = { inserted: 0, updated: 0, duplicates: 0 };
     let errorMessage: string | undefined;
+    let validationReport: Record<string, unknown> | undefined;
 
     try {
       jobs = await scraper.run();
-      persist = await this.persistEnriched(jobs);
+      const result = await this.persistEnriched(jobs, registration.sourceName);
+      persist = result.persist;
+      validationReport = result.validationReport;
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
@@ -140,20 +159,20 @@ export class ScrapeService {
     };
 
     await this.scrapeLogRepo.create(stats);
+    await this.sourceProfileRepo.recordCrawlComplete(
+      registration.sourceName,
+      stats,
+      validationReport,
+    );
 
     logger.info(
       {
         source: stats.source,
-        category: stats.category,
-        startTime: stats.startedAt.toISOString(),
-        endTime: stats.endedAt.toISOString(),
-        durationMs: stats.durationMs,
         jobsFound: stats.jobsFound,
         jobsInserted: stats.jobsInserted,
         jobsUpdated: stats.jobsUpdated,
-        duplicates: stats.duplicates,
         status: stats.status,
-        failures: stats.errorMessage,
+        validation: validationReport,
       },
       'Scrape run logged',
     );
@@ -161,15 +180,60 @@ export class ScrapeService {
     return stats;
   }
 
-  private async persistEnriched(jobs: Job[]): Promise<PersistResult> {
-    const enriched = enrichAndPrepare(jobs);
-    return this.jobRepo.upsertEnrichedMany(
+  private async persistEnriched(
+    jobs: Job[],
+    source?: string,
+  ): Promise<{ persist: PersistResult; validationReport: Record<string, unknown> }> {
+    const sorted = rankJobsByFreshness(jobs);
+    const { accepted, rejected, report } = validateJobBatch(sorted);
+
+    if (rejected.length > 0) {
+      logger.warn(
+        { source, rejected: rejected.length, flags: report.flagCounts },
+        'Jobs rejected by validation',
+      );
+    }
+
+    const enriched = enrichAndPrepare(accepted);
+    const persist = await this.jobRepo.upsertEnrichedMany(
       enriched.map((e) => ({
         job: e.job,
         skills: e.skills,
         companyEnrichment: e.companyEnrichment,
       })),
     );
+
+    if (source && accepted.length > 0) {
+      await this.jobRepo.markStaleInactive(
+        source,
+        accepted.map((j) => j.sourceJobId),
+      );
+    }
+
+    const expiredArchived = await this.jobRepo.deactivateExpired();
+    const unverifiedArchived = source ? await this.jobRepo.archiveUnverified(source, 21) : 0;
+
+    if (persist.inserted > 0 || persist.updated > 0) {
+      await mergeDuplicateJobs(getPrisma()).catch(() => undefined);
+    }
+
+    const crawlReport = await buildCrawlValidationReport(getPrisma(), {
+      source: source ?? 'unknown',
+      category: '',
+      startedAt: new Date(),
+      endedAt: new Date(),
+      durationMs: 0,
+      jobsFound: jobs.length,
+      jobsInserted: persist.inserted,
+      jobsUpdated: persist.updated,
+      duplicates: persist.duplicates,
+      status: 'success',
+    }, persist, { expiredArchived, unverifiedArchived });
+
+    return {
+      persist,
+      validationReport: { ...report, crawlValidation: crawlReport } as unknown as Record<string, unknown>,
+    };
   }
 
   async shutdown(): Promise<void> {

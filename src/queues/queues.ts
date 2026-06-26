@@ -21,6 +21,35 @@ export function getCategoryQueue(category: ScrapeCategory): Queue {
   return getQueue(getQueueForCategory(category));
 }
 
+export async function enqueueSourceScrape(sourceName: string, category: string): Promise<void> {
+  const queue = getCategoryQueue(category as ScrapeCategory);
+  await queue.add(
+    `scrape-${sourceName}`,
+    { category, sourceName },
+    {
+      removeOnComplete: 100,
+      removeOnFail: 50,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+      jobId: `source-${sourceName}-${Date.now()}`,
+    },
+  );
+}
+
+export async function enqueueLinkedInScrape(): Promise<void> {
+  const queue = getQueue(EXTENDED_QUEUE_NAMES.linkedin);
+  await queue.add(
+    'scrape-linkedin',
+    { category: 'linkedin', sourceName: 'linkedin' },
+    {
+      removeOnComplete: 50,
+      removeOnFail: 25,
+      attempts: 2,
+      jobId: `linkedin-${Date.now()}`,
+    },
+  );
+}
+
 export async function enqueueCategoryScrape(category: ScrapeCategory): Promise<void> {
   const queue = getCategoryQueue(category);
   await queue.add(

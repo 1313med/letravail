@@ -1,13 +1,11 @@
 import type { Job, EnrichedJob } from '../types/job.js';
 import { cleanText, stripHtml } from '../utils/cleaning.js';
 import { enrichCompany } from './company-enrichment.js';
-import { extractContractType } from './contract-extractor.js';
-import { extractEducationLevel } from './education-extractor.js';
-import { extractExperience } from './experience-extractor.js';
+import { resolveCompany } from '../platform/company-resolver.js';
+import { extractAllEntities } from './entity-extractor.js';
 import { isRemoteLocation, normalizeLocation } from './location-normalizer.js';
 import { scoreJobQuality } from './quality-scorer.js';
 import { extractSalary } from './salary-extractor.js';
-import { extractSkills } from './skill-extractor.js';
 
 export interface EnrichmentResult {
   job: EnrichedJob;
@@ -17,20 +15,25 @@ export interface EnrichmentResult {
 }
 
 export function enrichJob(raw: Job): EnrichmentResult {
-  const fullText = [raw.title, raw.description, raw.requirements].filter(Boolean).join('\n\n');
   const cleanedDescription = cleanText(raw.description);
   const rawHtml = raw.rawHtml;
+  const fullText = [raw.title, cleanedDescription, raw.requirements].filter(Boolean).join('\n\n');
 
-  const skills = extractSkills(fullText);
-  const experience = extractExperience(fullText, raw.title);
-  const contractType = extractContractType(fullText, raw.contractType);
-  const educationLevel = extractEducationLevel(fullText);
-  const salaryData = raw.salary
-    ? { salary: raw.salary }
-    : extractSalary(fullText);
+  const entities = extractAllEntities(fullText, raw.title);
+  const skills = entities.skills;
+  const contractType = entities.contractType ?? raw.contractType;
+  const educationLevel = entities.educationLevel;
+  const experience = {
+    experienceLevel: entities.experienceLevel,
+    experienceYears: entities.experienceYears,
+  };
+  const salaryData = raw.salary ? { salary: raw.salary } : extractSalary(fullText);
   const locationMeta = normalizeLocation(raw.city, raw.country);
-  const companyEnrichment = enrichCompany(raw.company);
-  const remote = raw.remote ?? isRemoteLocation(fullText);
+  const companyResolution = resolveCompany(raw.company);
+  const companyEnrichment = enrichCompany(companyResolution.canonicalName);
+  const remote =
+    raw.remote ??
+    (entities.workModel === 'remote' || (entities.workModel === 'hybrid' ? false : isRemoteLocation(fullText)));
 
   const hasCompanyEnrichment = !!companyEnrichment && Object.values(companyEnrichment).some(Boolean);
 
@@ -52,11 +55,27 @@ export function enrichJob(raw: Job): EnrichmentResult {
     descriptionLength: cleanedDescription.length,
     rawHtmlSize: rawHtml?.length ?? 0,
     skillsFound: skills.length,
+    languages: entities.languages,
+    certifications: entities.certifications,
+    benefits: entities.benefits,
+    department: entities.department,
+    workModel: entities.workModel,
+    requiresDrivingLicence: entities.requiresDrivingLicence,
+    requiresTravel: entities.requiresTravel,
+    seniority: entities.seniority,
+    managementLevel: entities.managementLevel,
+    visaSponsorship: entities.visaSponsorship,
+    relocation: entities.relocation,
+    remoteEligible: entities.remoteEligible,
+    businessFunction: entities.businessFunction,
+    entityCoverage: entities.coverage,
+    sections: entities.sections,
     dimensions: quality,
   };
 
   const job: EnrichedJob = {
     ...raw,
+    company: companyResolution.canonicalName,
     description: cleanedDescription,
     city: locationMeta.city,
     country: locationMeta.country,

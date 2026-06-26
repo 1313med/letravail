@@ -7,7 +7,6 @@ import { mergeDetailContent } from '../enrichment/job-enrichment.service.js';
 import { normalizeJobTextFields } from '../utils/cleaning.js';
 import { filterJobCandidates } from '../utils/job-filters.js';
 import { fetchGenericJobDetail } from './detail-fetchers.js';
-import { waitForAnySelector } from './helpers.js';
 
 export interface GenericScraperConfig {
   sourceName: string;
@@ -26,8 +25,10 @@ export function createGenericScraper(scraperConfig: GenericScraperConfig) {
       try {
         for (const url of scraperConfig.urls) {
           try {
-            await page.goto(url, { waitUntil: 'domcontentloaded' });
-            await waitForAnySelector(page, ['body'], 5_000);
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+            await page.waitForTimeout(3_000);
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await page.waitForTimeout(2_000);
             let jobs = await extractJobsFromPage(page, scraperConfig);
             if (jobs.length > 0) {
               if (scraperConfig.fetchDetails !== false) {
@@ -84,7 +85,7 @@ async function extractJobsFromPage(page: Page, scraperConfig: GenericScraperConf
 
       const candidates = Array.from(
         document.querySelectorAll(
-          'a[href*="offre-emploi"], a[href*="/requisition/"], a[href*="/jobs/"], a[href*="/job/"], a[href*="vacanc"], a.highlitedOffres-a',
+          'a[href*="offre"], a[href*="emploi"], a[href*="job"], a[href*="vacanc"], a[href*="requisition"], a[href*="poste"], a[href*="career"], a.highlitedOffres-a, .job-title a, .offer-title a, [class*="job"] a, [class*="offre"] a',
         ),
       );
 

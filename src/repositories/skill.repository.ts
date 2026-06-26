@@ -10,17 +10,26 @@ export class SkillRepository {
 
     for (const skill of skills) {
       const slug = skill.slug || slugifyEntity(skill.name);
-      const record = await this.db.skill.upsert({
-        where: { slug },
-        create: {
-          name: skill.name,
-          slug,
-          category: skill.category,
-        },
-        update: {
-          name: skill.name,
-          ...(skill.category && { category: skill.category }),
-        },
+      const existingByName = await this.db.skill.findUnique({ where: { name: skill.name } });
+      if (existingByName) {
+        map.set(slug, existingByName.id);
+        if (skill.category && !existingByName.category) {
+          await this.db.skill.update({
+            where: { id: existingByName.id },
+            data: { category: skill.category },
+          });
+        }
+        continue;
+      }
+
+      const existingBySlug = await this.db.skill.findUnique({ where: { slug } });
+      if (existingBySlug) {
+        map.set(slug, existingBySlug.id);
+        continue;
+      }
+
+      const record = await this.db.skill.create({
+        data: { name: skill.name, slug, category: skill.category },
       });
       map.set(slug, record.id);
     }
@@ -45,7 +54,7 @@ export class SkillRepository {
       .filter((row): row is { jobId: string; skillId: string; confidence: number } => row !== null);
 
     if (data.length > 0) {
-      await this.db.jobSkill.createMany({ data });
+      await this.db.jobSkill.createMany({ data, skipDuplicates: true });
     }
   }
 

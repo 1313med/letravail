@@ -26,6 +26,14 @@ export interface Job {
   salaryNet?: boolean;
   qualityScore?: number;
   descriptionScore?: number;
+  validationStatus?: string;
+  validationFlags?: string[];
+  sourcePublishedAt?: Date;
+  crawlCount?: number;
+  firstSeenAt?: Date;
+  lastSeenAt?: Date;
+  lastVerifiedAt?: Date;
+  contentHash?: string;
 }
 
 export interface EnrichedJob extends Job {
@@ -72,7 +80,10 @@ export interface CompanyEnrichmentInput {
   websiteUrl?: string;
   logoUrl?: string;
   industry?: string;
+  sector?: string;
   size?: string;
   careerPageUrl?: string;
   linkedinUrl?: string;
+  headquartersCity?: string;
+  description?: string;
 }

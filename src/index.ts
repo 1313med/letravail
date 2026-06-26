@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const container = getContainer();
 
   // Shorthand: `npm run scrape cih-bank` → scrape cih-bank
-  if (command && !['scrape', 'enqueue', 'scheduler', 'list'].includes(command)) {
+  if (command && !['scrape', 'enqueue', 'scheduler', 'list', 'dashboard'].includes(command)) {
     args = [command, ...args];
     command = 'scrape';
   }
@@ -58,14 +58,36 @@ async function main(): Promise<void> {
       }
       case 'scheduler': {
         const once = args.includes('--once');
+        const adaptive = !args.includes('--legacy');
         if (once) {
-          const mode = args.includes('--daily') ? 'daily' : args.includes('--6h') ? '6h' : 'all';
-          await runSchedulerOnce(mode);
-          logger.info({ mode }, 'Scheduler run once completed');
+          if (adaptive) {
+            const { runAdaptiveTick } = await import('./scheduler/adaptive-scheduler.js');
+            await runAdaptiveTick();
+          } else {
+            const mode = args.includes('--daily') ? 'daily' : args.includes('--6h') ? '6h' : 'all';
+            await runSchedulerOnce(mode);
+          }
+          logger.info({ adaptive }, 'Scheduler run once completed');
           break;
         }
-        startScheduler();
+        if (adaptive) {
+          const { startAdaptiveScheduler } = await import('./scheduler/adaptive-scheduler.js');
+          startAdaptiveScheduler();
+        } else {
+          startScheduler();
+        }
         return;
+      }
+      case 'dashboard': {
+        const { QualityDashboardService } = await import('./platform/quality-dashboard.service.js');
+        const { SourceProfileRepository } = await import('./repositories/source-profile.repository.js');
+        const db = (await import('./lib/prisma.js')).getPrisma();
+        const dashboard = new QualityDashboardService(db);
+        const profiles = new SourceProfileRepository(db);
+        await profiles.syncFromRegistry(container.scrapeService.getRegistry());
+        const report = await dashboard.generate();
+        console.log(JSON.stringify(report, null, 2));
+        break;
       }
       case 'list': {
         for (const reg of container.scrapeService.getRegistry()) {

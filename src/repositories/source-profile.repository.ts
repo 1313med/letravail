@@ -60,7 +60,7 @@ export class SourceProfileRepository {
         status: { in: ['active'] },
         OR: [{ nextCrawlAt: null }, { nextCrawlAt: { lte: now } }],
       },
-      orderBy: { intelligenceScore: 'desc' },
+      orderBy: [{ priorityScore: 'desc' }, { intelligenceScore: 'desc' }],
     });
     return profiles.map((p) => ({ sourceName: p.sourceName, category: p.category }));
   }

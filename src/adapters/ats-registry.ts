@@ -7,6 +7,7 @@ export type AtsPlatform =
   | 'lever'
   | 'smartrecruiters'
   | 'successfactors'
+  | 'talentsoft'
   | 'oracle-recruiting'
   | 'taleo'
   | 'icims'
@@ -31,7 +32,8 @@ export const ATS_REGISTRY: AtsProfile[] = [
   { platform: 'greenhouse', urlPatterns: [/greenhouse\.io/i, /boards\.greenhouse/i], detailFetchStrategy: 'api' },
   { platform: 'lever', urlPatterns: [/lever\.co/i, /jobs\.lever/i], detailFetchStrategy: 'api' },
   { platform: 'smartrecruiters', urlPatterns: [/smartrecruiters\.com/i], detailFetchStrategy: 'api' },
-  { platform: 'successfactors', urlPatterns: [/successfactors\.com/i, /career\d+\.successfactors/i], detailFetchStrategy: 'hybrid' },
+  { platform: 'talentsoft', urlPatterns: [/talent-soft\.com/i], detailFetchStrategy: 'hybrid' },
+  { platform: 'successfactors', urlPatterns: [/successfactors\.com/i, /career\d+\.successfactors/i, /performancemanager\.successfactors/i], detailFetchStrategy: 'hybrid' },
   { platform: 'oracle-recruiting', urlPatterns: [/oraclecloud\.com.*recruiting/i, /fa\.oraclecloud/i], detailFetchStrategy: 'api' },
   { platform: 'taleo', urlPatterns: [/taleo\.net/i], detailFetchStrategy: 'dom' },
   { platform: 'icims', urlPatterns: [/icims\.com/i], detailFetchStrategy: 'dom' },

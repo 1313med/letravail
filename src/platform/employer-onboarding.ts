@@ -3,6 +3,8 @@
  */
 import { probeCareerSite } from '../adapters/career-site-prober.js';
 import type { AtsPlatform } from '../adapters/ats-registry.js';
+import type { PrismaClient } from '@prisma/client';
+import { AtsIntelligenceRepository } from '../repositories/ats-intelligence.repository.js';
 
 export interface EmployerOnboardingReport {
   inputUrl: string;
@@ -66,6 +68,10 @@ export async function onboardEmployer(
   if (probe.greenhouseToken) atsDetected = 'greenhouse';
   if (probe.leverSlug) atsDetected = 'lever';
   if (probe.workdayConfig) atsDetected = 'workday';
+  if (probe.finalUrl.includes('talent-soft.com') || probe.apiEndpoints.some((e) => /talent-soft/i.test(e))) {
+    atsDetected = 'talentsoft';
+  }
+  if (probe.apiEndpoints.some((e) => /intelcia\.com\/api/i.test(e))) atsDetected = 'successfactors';
 
   const { strategy, adapter, complexity, maintenance } = resolveStrategy(atsDetected, probe);
 
@@ -93,7 +99,8 @@ export async function onboardEmployer(
   if (probe.workdayConfig) {
     nextSteps.push(`Configure Workday: host=${probe.workdayConfig.host}, site=${probe.workdayConfig.site}`);
   }
-  if (strategy === 'api') nextSteps.push('Add to ats-employer.scraper.ts and registry.ts');
+  if (strategy === 'api') nextSteps.push('Register in source catalog — config-only onboarding');
+  if (atsDetected === 'talentsoft') nextSteps.push('Use talentsoft.adapter.ts with listing URL');
 
   return {
     inputUrl: websiteUrl,
@@ -158,14 +165,31 @@ function resolveStrategy(
   if (ats === 'greenhouse') return { strategy: 'api', adapter: 'greenhouse.adapter.ts', complexity: 'low', maintenance: 'low' };
   if (ats === 'lever') return { strategy: 'api', adapter: 'lever.adapter.ts', complexity: 'low', maintenance: 'low' };
   if (ats === 'workday') return { strategy: 'api', adapter: 'workday.adapter.ts', complexity: 'medium', maintenance: 'low' };
+  if (ats === 'talentsoft') return { strategy: 'hybrid', adapter: 'talentsoft.adapter.ts', complexity: 'medium', maintenance: 'low' };
+  if (ats === 'successfactors') return { strategy: 'hybrid', adapter: 'intelcia.adapter.ts / custom API', complexity: 'medium', maintenance: 'medium' };
   if (ats === 'csod') return { strategy: 'api', adapter: 'attijariwafa pattern', complexity: 'medium', maintenance: 'medium' };
-  if (ats === 'smartrecruiters') return { strategy: 'api', adapter: 'smartrecruiters.adapter.ts (planned)', complexity: 'medium', maintenance: 'medium' };
+  if (ats === 'smartrecruiters') return { strategy: 'api', adapter: 'smartrecruiters.adapter.ts', complexity: 'medium', maintenance: 'medium' };
   if (probe.apiEndpoints.length > 0) return { strategy: 'hybrid', adapter: 'ats-career-scraper.ts', complexity: 'medium', maintenance: 'medium' };
   return { strategy: 'dom', adapter: 'generic.scraper.ts', complexity: 'high', maintenance: 'high' };
 }
 
 function estimateVolume(ats: AtsPlatform, apiCount: number): EmployerOnboardingReport['estimatedJobVolume'] {
-  if (['greenhouse', 'lever', 'workday', 'csod', 'smartrecruiters'].includes(ats)) return 'high';
+  if (['greenhouse', 'lever', 'workday', 'csod', 'smartrecruiters', 'talentsoft', 'successfactors'].includes(ats)) return 'high';
   if (apiCount > 0) return 'medium';
   return 'unknown';
+}
+
+export async function onboardAndPersist(
+  db: PrismaClient,
+  websiteUrl: string,
+  opts: { companyName?: string; sourceName?: string } = {},
+): Promise<EmployerOnboardingReport> {
+  const report = await onboardEmployer(websiteUrl, opts.companyName);
+  const repo = new AtsIntelligenceRepository(db);
+  await repo.saveProbe(report, {
+    sourceName: opts.sourceName,
+    companyName: opts.companyName ?? report.companyName ?? new URL(websiteUrl).hostname,
+    inputUrl: websiteUrl,
+  });
+  return report;
 }

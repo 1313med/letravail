@@ -36,7 +36,6 @@ export async function probeCareerSite(url: string): Promise<CareerSiteProbe> {
   }
 
   const detected = detectAtsPlatform(finalUrl) ?? ats;
-  const platform = detected?.platform ?? 'custom';
 
   const greenhouseMatch = html.match(/boards\.greenhouse\.io\/([a-z0-9_-]+)/i)
     ?? finalUrl.match(/greenhouse\.io\/([a-z0-9_-]+)/i);
@@ -58,8 +57,32 @@ export async function probeCareerSite(url: string): Promise<CareerSiteProbe> {
     apiEndpoints.push('csod:rec-job-search');
   }
 
+  let talentSoftListing: string | undefined;
+  if (/talent-soft\.com/i.test(finalUrl) || /talent-soft\.com/i.test(html)) {
+    talentSoftListing = finalUrl.includes('liste-toutes-offres')
+      ? finalUrl
+      : `${new URL(finalUrl).origin}/offre-de-emploi/liste-toutes-offres.aspx?all=1&mode=layer`;
+    apiEndpoints.push(talentSoftListing);
+  }
+
+  if (/careers\.intelcia\.com/i.test(finalUrl) || /careers\.intelcia\.com/i.test(html)) {
+    apiEndpoints.push('https://careers.intelcia.com/api/offers?locale=fr_FR&country=MAR');
+  }
+
+  if (/successfactors/i.test(html) || /performancemanager\.successfactors/i.test(html)) {
+    const sfMatch = html.match(/https?:\/\/[^"'\s]*successfactors[^"'\s]*/i);
+    if (sfMatch) apiEndpoints.push(sfMatch[0]);
+  }
+
   const sitemapUrls = await discoverSitemaps(finalUrl);
   const robotsAllowed = await checkRobotsAllowed(finalUrl);
+
+  let platform = detected?.platform ?? 'custom';
+  if (talentSoftListing) platform = 'talentsoft';
+  if (apiEndpoints.some((e) => /intelcia\.com\/api/i.test(e))) platform = 'successfactors';
+  if (workdayConfig) platform = 'workday';
+  if (greenhouseMatch) platform = 'greenhouse';
+  if (leverMatch) platform = 'lever';
 
   return {
     url,

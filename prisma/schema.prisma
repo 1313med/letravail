@@ -155,6 +155,11 @@ model SourceProfile {
   nextCrawlAt          DateTime?
   atsPlatform          String?
   careerPageUrl        String?
+  probeConfidence      Float?
+  crawlStrategy        String?
+  lastProbedAt         DateTime?
+  jsRenderingRequired  Boolean   @default(false)
+  priorityScore        Float?
   intelligenceScore    Float?
   freshnessScore       Float?
   jobsDiscovered       Int       @default(0)
@@ -176,7 +181,50 @@ model SourceProfile {
   @@index([status])
   @@index([nextCrawlAt])
   @@index([intelligenceScore])
+  @@index([priorityScore])
   @@map("source_profiles")
+}
+
+model EmployerAtsIntelligence {
+  id                    String   @id @default(cuid())
+  sourceName            String?
+  companyName           String
+  inputUrl              String
+  careersPageUrl        String?
+  finalUrl              String?
+  atsPlatform           String
+  confidence            Float
+  crawlStrategy         String
+  recommendedAdapter    String?
+  apiEndpoints          String[] @default([])
+  platformConfig        Json?
+  robotsAllowed         Boolean  @default(true)
+  sitemapUrls           String[] @default([])
+  jsRenderingRequired   Boolean  @default(false)
+  paginationType        String?
+  detailEndpoint        String?
+  applicationUrlPattern String?
+  authRequired          Boolean  @default(false)
+  estimatedJobVolume    String?
+  technicalComplexity   String?
+  maintenanceEffort     String?
+  graphqlDetected       Boolean  @default(false)
+  structuredData        Boolean  @default(false)
+  issues                String[] @default([])
+  onboardingStatus      String   @default("probed")
+  probedAt              DateTime @default(now())
+  probeVersion          Int      @default(1)
+  rawProbe              Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([sourceName])
+  @@index([companyName])
+  @@index([atsPlatform])
+  @@index([confidence])
+  @@index([probedAt])
+  @@index([onboardingStatus])
+  @@map("employer_ats_intelligence")
 }
 
 model Location {

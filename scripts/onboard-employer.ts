@@ -1,21 +1,30 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { onboardEmployer } from '../src/platform/employer-onboarding.js';
+import { getPrisma, disconnectPrisma } from '../src/lib/prisma.js';
+import { onboardAndPersist, onboardEmployer } from '../src/platform/employer-onboarding.js';
 
-const url = process.argv[2];
-const companyName = process.argv[3];
+const args = process.argv.slice(2);
+const positional = args.filter((a) => !a.startsWith('--'));
+const url = positional[0];
+const companyName = positional[1];
+const persist = args.includes('--persist');
+const sourceName = args.find((a) => a.startsWith('--source='))?.split('=')[1];
 
 if (!url) {
-  console.log('Usage: npm run onboard:employer -- <website-url> [company-name]');
+  console.log('Usage: npm run onboard:employer -- <website-url> [company-name] [--persist] [--source=source-name]');
   process.exit(1);
 }
 
 console.log(`Onboarding: ${url}\n`);
-const report = await onboardEmployer(url, companyName);
+const db = getPrisma();
+const report = persist
+  ? await onboardAndPersist(db, url, { companyName, sourceName })
+  : await onboardEmployer(url, companyName);
 
 const lines = [
   '# Employer Onboarding Report',
   `Generated: ${new Date().toISOString()}`,
+  persist ? '**Persisted to ATS intelligence database**' : '',
   '',
   `**Input:** ${report.inputUrl}`,
   report.companyName ? `**Company:** ${report.companyName}` : '',
@@ -61,3 +70,5 @@ writeFileSync(path, lines.filter(Boolean).join('\n'), 'utf-8');
 
 console.log(lines.filter(Boolean).join('\n'));
 console.log(`\nWritten: ${path}`);
+
+await disconnectPrisma();

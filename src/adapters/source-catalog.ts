@@ -37,7 +37,7 @@ export const MOROCCO_SOURCE_CATALOG: SourceCatalogEntry[] = [
   { sourceName: 'marjane', companyName: 'Marjane', category: 'retail', sector: 'retail', status: 'active', priority: 45, estimatedMonthlyJobs: 40 },
   { sourceName: 'labelvie', companyName: 'LabelVie', category: 'retail', sector: 'retail', status: 'active', priority: 45, estimatedMonthlyJobs: 30 },
   // Planned — Banks (Sprint 3 active)
-  { sourceName: 'banque-populaire', companyName: 'Banque Populaire', category: 'banks', sector: 'banks', status: 'active', careerPageUrl: 'https://www.groupebcp.ma/fr/carrieres', atsPlatform: 'workday', priority: 88, estimatedMonthlyJobs: 100 },
+  { sourceName: 'banque-populaire', companyName: 'Banque Populaire', category: 'banks', sector: 'banks', status: 'active', careerPageUrl: 'https://bcp-cand.talent-soft.com/offre-de-emploi/liste-toutes-offres.aspx?all=1&mode=layer', atsPlatform: 'talentsoft', priority: 88, estimatedMonthlyJobs: 100 },
   { sourceName: 'credit-du-maroc', companyName: 'Crédit du Maroc', category: 'banks', sector: 'banks', status: 'active', priority: 82, estimatedMonthlyJobs: 60 },
   { sourceName: 'credit-agricole-maroc', companyName: 'Crédit Agricole du Maroc', category: 'banks', sector: 'banks', status: 'active', priority: 80, estimatedMonthlyJobs: 50 },
   { sourceName: 'societe-generale-maroc', companyName: 'Société Générale Maroc', category: 'banks', sector: 'banks', status: 'active', priority: 78, estimatedMonthlyJobs: 40 },
@@ -62,7 +62,7 @@ export const MOROCCO_SOURCE_CATALOG: SourceCatalogEntry[] = [
   { sourceName: 'sqli-maroc', companyName: 'SQLI Maroc', category: 'technology', sector: 'technology', status: 'planned', priority: 58, estimatedMonthlyJobs: 35 },
   { sourceName: 'devoteam-maroc', companyName: 'Devoteam Maroc', category: 'technology', sector: 'technology', status: 'planned', priority: 58, estimatedMonthlyJobs: 30 },
   // Planned — BPO / Call Centers (high priority)
-  { sourceName: 'intelcia', companyName: 'Intelcia', category: 'technology', sector: 'bpo', status: 'active', careerPageUrl: 'https://www.intelcia.com/fr/nous-rejoindre/', priority: 90, estimatedMonthlyJobs: 200 },
+  { sourceName: 'intelcia', companyName: 'Intelcia', category: 'technology', sector: 'bpo', status: 'active', careerPageUrl: 'https://careers.intelcia.com/fr-ma/offres-emploi?sp=true', atsPlatform: 'successfactors', priority: 90, estimatedMonthlyJobs: 200 },
   { sourceName: 'teleperformance-maroc', companyName: 'Teleperformance Maroc', category: 'technology', sector: 'bpo', status: 'active', careerPageUrl: 'https://jobs.teleperformance.com/', priority: 88, estimatedMonthlyJobs: 300 },
   { sourceName: 'foundever-maroc', companyName: 'Foundever Maroc', category: 'technology', sector: 'bpo', status: 'active', careerPageUrl: 'https://jobs.foundever.com/', priority: 85, estimatedMonthlyJobs: 250 },
   { sourceName: 'concentrix-maroc', companyName: 'Concentrix Maroc', category: 'technology', sector: 'bpo', status: 'active', careerPageUrl: 'https://jobs.concentrix.com/', priority: 85, estimatedMonthlyJobs: 200 },

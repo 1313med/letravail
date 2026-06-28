@@ -1,9 +1,8 @@
 /**
  * Automatic employer discovery — find new career pages from seeds and job data.
  */
-import type { PrismaClient } from '@prisma/client';
 import { probeCareerSite } from '../adapters/career-site-prober.js';
-import { onboardEmployer } from './employer-onboarding.js';
+import { onboardEmployer, onboardAndPersist } from './employer-onboarding.js';
 import { MOROCCO_SOURCE_CATALOG } from '../adapters/source-catalog.js';
 import { logger } from '../lib/logger.js';
 
@@ -25,7 +24,8 @@ const SEED_DOMAINS = [
   'https://www.concentrix.com',
   'https://www.webhelp.com',
   'https://www.comdatagroup.com',
-  'https://www.groupebcp.ma',
+  'https://bcp-cand.talent-soft.com',
+  'https://careers.intelcia.com',
   'https://www.creditdumaroc.ma',
   'https://www.creditagricole.ma',
   'https://www.iam.ma',
@@ -37,7 +37,10 @@ const SEED_DOMAINS = [
   'https://www.accenture.com/ma-fr',
 ];
 
-export async function discoverEmployers(db: PrismaClient): Promise<DiscoveredEmployer[]> {
+export async function discoverEmployers(
+  db: import('@prisma/client').PrismaClient,
+  opts: { persist?: boolean } = {},
+): Promise<DiscoveredEmployer[]> {
   const registered = new Set(MOROCCO_SOURCE_CATALOG.map((c) => c.sourceName));
   const discovered: DiscoveredEmployer[] = [];
 
@@ -59,7 +62,9 @@ export async function discoverEmployers(db: PrismaClient): Promise<DiscoveredEmp
 
   for (const url of seeds) {
     try {
-      const report = await onboardEmployer(url);
+      const report = opts.persist
+        ? await onboardAndPersist(db, url)
+        : await onboardEmployer(url);
       const sourceName = slugify(report.companyName ?? new URL(url).hostname);
       const alreadyRegistered = registered.has(sourceName) ||
         MOROCCO_SOURCE_CATALOG.some((c) => c.companyName.toLowerCase() === (report.companyName ?? '').toLowerCase());

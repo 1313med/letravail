@@ -160,6 +160,9 @@ model SourceProfile {
   lastProbedAt         DateTime?
   jsRenderingRequired  Boolean   @default(false)
   priorityScore        Float?
+  activationState      String    @default("active")
+  healthScore          Float?
+  lastHealthUpdate     DateTime?
   intelligenceScore    Float?
   freshnessScore       Float?
   jobsDiscovered       Int       @default(0)
@@ -182,6 +185,8 @@ model SourceProfile {
   @@index([nextCrawlAt])
   @@index([intelligenceScore])
   @@index([priorityScore])
+  @@index([activationState])
+  @@index([healthScore])
   @@map("source_profiles")
 }
 
@@ -212,6 +217,17 @@ model EmployerAtsIntelligence {
   structuredData        Boolean  @default(false)
   issues                String[] @default([])
   onboardingStatus      String   @default("probed")
+  activationState       String   @default("PROBED")
+  healthScore           Float?
+  validationScore       Float?
+  lastValidationAt      DateTime?
+  lastHealthCheck       DateTime?
+  activationReason      String?
+  deactivationReason    String?
+  automaticActivation   Boolean  @default(false)
+  retryCount            Int      @default(0)
+  nextRetryAt           DateTime?
+  validationSummary     Json?
   probedAt              DateTime @default(now())
   probeVersion          Int      @default(1)
   rawProbe              Json?
@@ -224,6 +240,9 @@ model EmployerAtsIntelligence {
   @@index([confidence])
   @@index([probedAt])
   @@index([onboardingStatus])
+  @@index([activationState])
+  @@index([healthScore])
+  @@index([nextRetryAt])
   @@map("employer_ats_intelligence")
 }
 

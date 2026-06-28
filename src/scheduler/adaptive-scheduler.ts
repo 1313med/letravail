@@ -5,8 +5,10 @@ import { getPrisma } from '../lib/prisma.js';
 import { enqueueSourceScrape, enqueueLinkedInScrape } from '../queues/queues.js';
 import { isSourceDue } from '../platform/crawl-schedule.js';
 import { refreshAllPriorities } from '../platform/source-priority-engine.js';
+import { EmployerActivationEngine } from '../platform/employer-activation-engine.js';
 
 const jobs: CronJob[] = [];
+let activationTickCount = 0;
 
 /**
  * Adaptive scheduler — checks every minute which sources are due for crawl.
@@ -26,6 +28,15 @@ export async function runAdaptiveTick(): Promise<void> {
   const { sourceProfileRepo } = getContainer();
   await sourceProfileRepo.syncFromRegistry(getContainer().scrapeService.getRegistry());
   await refreshAllPriorities(getPrisma()).catch(() => undefined);
+
+  activationTickCount++;
+  if (activationTickCount % 15 === 0) {
+    const { scrapeService } = getContainer();
+    const engine = new EmployerActivationEngine(getPrisma(), scrapeService);
+    await engine.retryReadyEmployers().catch(() => undefined);
+    await engine.recalculateHealth(10).catch(() => undefined);
+    await engine.activateReadyEmployers(5).catch(() => undefined);
+  }
 
   const due = await sourceProfileRepo.getDueSources();
 

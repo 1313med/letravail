@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { initialActivationState } from '../platform/activation-states.js';
 import type { EmployerOnboardingReport } from '../platform/employer-onboarding.js';
 
 export interface PersistProbeOptions {
@@ -57,6 +58,7 @@ export class AtsIntelligenceRepository {
         graphqlDetected: report.graphqlDetected,
         structuredData: report.structuredData,
         issues: report.issues,
+        activationState: initialActivationState(report.confidenceScore),
         onboardingStatus: report.confidenceScore >= 70 ? 'ready' : 'probed',
         rawProbe: report as unknown as Prisma.InputJsonValue,
       },

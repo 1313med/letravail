@@ -15,6 +15,7 @@ import { enrichAndPrepare } from './enrichment.service.js';
 import { getPrisma } from '../lib/prisma.js';
 import { mergeDuplicateJobs } from '../platform/duplicate-merger.js';
 import { rankJobsByFreshness } from '../platform/job-ranker.js';
+import { syncProductionStateAfterCrawl } from '../platform/employer-activation-engine.js';
 
 export type ScraperFactory = (pagePool: PagePool) => BaseScraper;
 
@@ -44,6 +45,16 @@ export class ScrapeService {
       throw new Error(`Unknown source: ${sourceName}`);
     }
     return this.runScraper(registration);
+  }
+
+  /** Dry-run crawl for activation validation — no persist. */
+  async collectJobs(sourceName: string): Promise<Job[]> {
+    const registration = this.registry.find((r) => r.sourceName === sourceName);
+    if (!registration) {
+      throw new Error(`Unknown source: ${sourceName}`);
+    }
+    const scraper = registration.factory(this.pagePool);
+    return scraper.run();
   }
 
   async scrapeCategory(category: ScrapeCategory): Promise<ScrapeRunStats[]> {
@@ -163,6 +174,10 @@ export class ScrapeService {
       registration.sourceName,
       stats,
       validationReport,
+    );
+
+    await syncProductionStateAfterCrawl(getPrisma(), registration.sourceName, stats.jobsFound).catch(
+      () => undefined,
     );
 
     logger.info(

@@ -55,6 +55,9 @@ export function computeSourcePriority(profile: SourceProfile): SourcePriorityRes
 
   const probeBoost = (profile.probeConfidence ?? 0) >= 70 ? 0.1 : 0;
   const strategyBoost = profile.crawlStrategy === 'api' ? 0.08 : 0;
+  const healthBoost = ((profile.healthScore ?? 50) / 100) * 0.1;
+  const activationBoost =
+    profile.activationState === 'ACTIVE' || profile.activationState === 'MONITORED' ? 0.05 : 0;
 
   const factors: PriorityFactors = {
     freshness,
@@ -79,7 +82,9 @@ export function computeSourcePriority(profile: SourceProfile): SourcePriorityRes
     reliability * 0.1 -
     duplicatePenalty * 0.1 +
     probeBoost +
-    strategyBoost;
+    strategyBoost +
+    healthBoost +
+    activationBoost;
 
   const priorityScore = Math.round(Math.max(0, Math.min(100, raw * 100)));
   const tier = scoreToTier(priorityScore, profile.activeJobs);

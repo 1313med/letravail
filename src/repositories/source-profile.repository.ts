@@ -12,6 +12,7 @@ export class SourceProfileRepository {
     for (const reg of registry) {
       const catalog = MOROCCO_SOURCE_CATALOG.find((c) => c.sourceName === reg.sourceName);
       const interval = getCrawlInterval(reg.sourceName, reg.schedule);
+      const jobCount = await this.db.job.count({ where: { source: reg.sourceName, isActive: true } });
 
       await this.db.sourceProfile.upsert({
         where: { sourceName: reg.sourceName },
@@ -23,7 +24,8 @@ export class SourceProfileRepository {
           careerPageUrl: catalog?.careerPageUrl,
           atsPlatform: catalog?.atsPlatform,
           status: catalog?.status === 'planned' ? 'planned' : 'active',
-          activeJobs: await this.db.job.count({ where: { source: reg.sourceName, isActive: true } }),
+          activationState: jobCount > 0 ? 'ACTIVE' : 'active',
+          activeJobs: jobCount,
           metadata: { priority: catalog?.priority ?? 50 },
         },
         update: {
@@ -31,7 +33,8 @@ export class SourceProfileRepository {
           crawlIntervalMinutes: interval,
           careerPageUrl: catalog?.careerPageUrl,
           atsPlatform: catalog?.atsPlatform,
-          activeJobs: await this.db.job.count({ where: { source: reg.sourceName, isActive: true } }),
+          activeJobs: jobCount,
+          ...(jobCount > 0 && { activationState: 'ACTIVE', status: 'active' }),
         },
       });
     }
@@ -44,8 +47,9 @@ export class SourceProfileRepository {
         companyName: 'LinkedIn Morocco',
         crawlIntervalMinutes: 60,
         status: 'active',
+        activationState: 'ACTIVE',
       },
-      update: { crawlIntervalMinutes: 60 },
+      update: { crawlIntervalMinutes: 60, activationState: 'ACTIVE' },
     });
   }
 
@@ -58,9 +62,18 @@ export class SourceProfileRepository {
     const profiles = await this.db.sourceProfile.findMany({
       where: {
         status: { in: ['active'] },
-        OR: [{ nextCrawlAt: null }, { nextCrawlAt: { lte: now } }],
+        OR: [
+          { activationState: { in: ['ACTIVE', 'MONITORED', 'active'] } },
+          { activationState: { equals: '' } },
+        ],
+        AND: [{ OR: [{ nextCrawlAt: null }, { nextCrawlAt: { lte: now } }] }],
       },
-      orderBy: [{ priorityScore: 'desc' }, { intelligenceScore: 'desc' }],
+      orderBy: [
+        { priorityScore: 'desc' },
+        { healthScore: 'desc' },
+        { freshnessScore: 'desc' },
+        { intelligenceScore: 'desc' },
+      ],
     });
     return profiles.map((p) => ({ sourceName: p.sourceName, category: p.category }));
   }

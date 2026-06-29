@@ -4,14 +4,17 @@
  */
 import { getPrisma, disconnectPrisma } from '../src/lib/prisma.js';
 import { getContainer } from '../src/container.js';
-import { MOROCCO_SOURCE_CATALOG } from '../src/adapters/source-catalog.js';
+import {
+  MISSION_SECTOR_ORDER,
+  MOROCCO_SOURCE_CATALOG,
+} from '../src/adapters/source-catalog.js';
 import { mergeDuplicateJobs } from '../src/platform/duplicate-merger.js';
 
 const args = process.argv.slice(2);
 const sector = args.find((a) => a.startsWith('--sector='))?.split('=')[1];
 const limit = Number(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? 12);
 
-const PRIORITY_SECTORS = ['bpo', 'banks', 'telecom', 'consulting', 'retail', 'government'];
+const PRIORITY_SECTORS = [...MISSION_SECTOR_ORDER];
 
 const db = getPrisma();
 const { scrapeService, sourceProfileRepo } = getContainer();

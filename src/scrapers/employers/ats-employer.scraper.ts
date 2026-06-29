@@ -4,10 +4,10 @@ import type { ScrapeCategory } from '../../config/index.js';
 import { BaseScraper } from '../base.scraper.js';
 import { fetchAtsCareerJobs, type AtsCareerConfig } from '../../adapters/ats-career-scraper.js';
 
-class AtsEmployerScraper extends BaseScraper {
+export class AtsEmployerScraper extends BaseScraper {
   readonly sourceName: string;
   readonly companyName: string;
-  readonly category: 'banks' | 'technology' | 'retail' | 'automotive' | 'government' | 'telecom';
+  readonly category: 'banks' | 'technology' | 'retail' | 'automotive' | 'government' | 'telecom' | 'airlines';
   private readonly config: AtsCareerConfig & { category?: ScrapeCategory };
 
   constructor(
@@ -52,8 +52,8 @@ export class CreditDuMarocScraper extends AtsEmployerScraper {
         companyName: 'Crédit du Maroc',
         category: 'banks',
         careerUrls: [
-          'https://www.creditdumaroc.ma/fr/carrieres',
-          'https://career2.successfactors.eu/career?company=creditdum',
+          'https://carriere.creditdumaroc.ma/offre-de-emploi/liste-toutes-offres.aspx?all=1&mode=list',
+          'https://carriere.creditdumaroc.ma/',
         ],
         tags: ['banks', 'credit-du-maroc'],
       },

@@ -1,0 +1,255 @@
+/**
+ * Static ATS platform mastery profiles — Mission 9 priority order.
+ */
+import type { AtsPlatform } from '../adapters/ats-registry.js';
+
+export interface AtsPlatformProfileSeed {
+  platform: AtsPlatform | 'custom';
+  displayName: string;
+  priority: number;
+  detectionConfidence: number;
+  authRequired: boolean;
+  paginationStrategy: string;
+  apiEndpointPattern: string;
+  networkRequestHints: string[];
+  detailPageStrategy: string;
+  rateLimitPerMinute: number;
+  knownIssues: string[];
+  domStructureHints: string[];
+  robotsPolicy: string;
+  playwrightRequired: boolean;
+  adapterModule: string;
+  estimatedEmployersMorocco: number;
+  estimatedJobsUnlockable: number;
+}
+
+/** Mission 9 priority order — index + 1 = priority rank. */
+export const MISSION_ATS_PRIORITY: Array<AtsPlatform | 'custom'> = [
+  'workday',
+  'talentsoft',
+  'successfactors',
+  'greenhouse',
+  'oracle-recruiting',
+  'lever',
+  'smartrecruiters',
+  'icims',
+  'teamtailor',
+  'custom',
+];
+
+export const ATS_PLATFORM_PROFILES: AtsPlatformProfileSeed[] = [
+  {
+    platform: 'workday',
+    displayName: 'Workday',
+    priority: 100,
+    detectionConfidence: 95,
+    authRequired: false,
+    paginationStrategy: 'offset_post',
+    apiEndpointPattern: 'https://{host}/wday/cxs/{tenant}/{site}/jobs',
+    networkRequestHints: ['POST /wday/cxs/', 'application/json', 'searchText', 'appliedFacets'],
+    detailPageStrategy: 'api_detail_path',
+    rateLimitPerMinute: 30,
+    knownIssues: [
+      'Global portals return non-Morocco jobs without location filter',
+      'postedOn dates may be human-readable strings (Invalid Date)',
+      'Morocco facet IDs vary per tenant',
+    ],
+    domStructureHints: ['myworkdayjobs.com', 'wd*.myworkdayjobs.com'],
+    robotsPolicy: 'generally_allowed',
+    playwrightRequired: false,
+    adapterModule: 'workday.adapter.ts',
+    estimatedEmployersMorocco: 12,
+    estimatedJobsUnlockable: 2800,
+  },
+  {
+    platform: 'talentsoft',
+    displayName: 'TalentSoft',
+    priority: 95,
+    detectionConfidence: 90,
+    authRequired: false,
+    paginationStrategy: 'aspnet_paginated_list',
+    apiEndpointPattern: '{origin}/offre-de-emploi/liste-toutes-offres.aspx?all=1',
+    networkRequestHints: ['talent-soft.com', 'carriere.*.ma', 'liste-toutes-offres'],
+    detailPageStrategy: 'dom_detail_page',
+    rateLimitPerMinute: 20,
+    knownIssues: [
+      'Cookie consent banners block listing',
+      'Pagination requires all=1&mode=list',
+      'carriere.*.ma custom domains need TalentSoft detection',
+    ],
+    domStructureHints: ['.ts-offer-list-item', 'offre-de-emploi', 'liste-toutes-offres'],
+    robotsPolicy: 'generally_allowed',
+    playwrightRequired: true,
+    adapterModule: 'talentsoft.adapter.ts',
+    estimatedEmployersMorocco: 6,
+    estimatedJobsUnlockable: 1900,
+  },
+  {
+    platform: 'successfactors',
+    displayName: 'SAP SuccessFactors',
+    priority: 90,
+    detectionConfidence: 75,
+    authRequired: false,
+    paginationStrategy: 'api_offset',
+    apiEndpointPattern: '/api/offers?country=MAR',
+    networkRequestHints: ['successfactors.com', '/api/offers', 'performancemanager'],
+    detailPageStrategy: 'api_or_dom_hybrid',
+    rateLimitPerMinute: 25,
+    knownIssues: [
+      'Public API not universal — Intelcia pattern is custom',
+      'Many instances require authenticated RMK',
+      'Country filter parameter varies',
+    ],
+    domStructureHints: ['successfactors', 'rmk', 'jobReqId'],
+    robotsPolicy: 'varies',
+    playwrightRequired: true,
+    adapterModule: 'intelcia.adapter.ts',
+    estimatedEmployersMorocco: 8,
+    estimatedJobsUnlockable: 1200,
+  },
+  {
+    platform: 'greenhouse',
+    displayName: 'Greenhouse',
+    priority: 85,
+    detectionConfidence: 92,
+    authRequired: false,
+    paginationStrategy: 'cursor_api',
+    apiEndpointPattern: 'https://boards-api.greenhouse.io/v1/boards/{token}/jobs',
+    networkRequestHints: ['boards.greenhouse.io', 'greenhouse.io'],
+    detailPageStrategy: 'api_content_field',
+    rateLimitPerMinute: 60,
+    knownIssues: ['Board token must be extracted from embed', 'Location filter in API response'],
+    domStructureHints: ['boards.greenhouse.io/embed', 'gh-jobs-list'],
+    robotsPolicy: 'allowed',
+    playwrightRequired: false,
+    adapterModule: 'greenhouse.adapter.ts',
+    estimatedEmployersMorocco: 5,
+    estimatedJobsUnlockable: 400,
+  },
+  {
+    platform: 'oracle-recruiting',
+    displayName: 'Oracle Recruiting Cloud',
+    priority: 80,
+    detectionConfidence: 70,
+    authRequired: false,
+    paginationStrategy: 'rest_offset',
+    apiEndpointPattern: 'https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions',
+    networkRequestHints: ['oraclecloud.com', 'fa.oraclecloud', 'recruitingCE'],
+    detailPageStrategy: 'api_requisition_detail',
+    rateLimitPerMinute: 20,
+    knownIssues: ['Complex facet model', 'Morocco location facet discovery needed'],
+    domStructureHints: ['oraclecloud.com/hcmUI', 'recruiting'],
+    robotsPolicy: 'varies',
+    playwrightRequired: true,
+    adapterModule: 'oracle-recruiting.adapter.ts (planned)',
+    estimatedEmployersMorocco: 4,
+    estimatedJobsUnlockable: 600,
+  },
+  {
+    platform: 'lever',
+    displayName: 'Lever',
+    priority: 75,
+    detectionConfidence: 90,
+    authRequired: false,
+    paginationStrategy: 'single_page_api',
+    apiEndpointPattern: 'https://api.lever.co/v0/postings/{slug}',
+    networkRequestHints: ['jobs.lever.co', 'api.lever.co'],
+    detailPageStrategy: 'api_listing',
+    rateLimitPerMinute: 60,
+    knownIssues: ['Morocco filter via categories.location'],
+    domStructureHints: ['lever.co', 'posting-category'],
+    robotsPolicy: 'allowed',
+    playwrightRequired: false,
+    adapterModule: 'lever.adapter.ts',
+    estimatedEmployersMorocco: 3,
+    estimatedJobsUnlockable: 250,
+  },
+  {
+    platform: 'smartrecruiters',
+    displayName: 'SmartRecruiters',
+    priority: 70,
+    detectionConfidence: 85,
+    authRequired: false,
+    paginationStrategy: 'offset_api',
+    apiEndpointPattern: 'https://api.smartrecruiters.com/v1/companies/{id}/postings',
+    networkRequestHints: ['smartrecruiters.com', 'api.smartrecruiters.com'],
+    detailPageStrategy: 'api_detail',
+    rateLimitPerMinute: 40,
+    knownIssues: ['Company ID discovery from careers page'],
+    domStructureHints: ['smartrecruiters.com', 'sr-job-list'],
+    robotsPolicy: 'allowed',
+    playwrightRequired: false,
+    adapterModule: 'smartrecruiters.adapter.ts',
+    estimatedEmployersMorocco: 4,
+    estimatedJobsUnlockable: 350,
+  },
+  {
+    platform: 'icims',
+    displayName: 'iCIMS',
+    priority: 65,
+    detectionConfidence: 80,
+    authRequired: false,
+    paginationStrategy: 'dom_paginated',
+    apiEndpointPattern: 'jobs-{company}.icims.com/jobs/search',
+    networkRequestHints: ['icims.com', 'jobs/search', 'in_iframe=1'],
+    detailPageStrategy: 'dom_detail',
+    rateLimitPerMinute: 15,
+    knownIssues: [
+      'Heavy iframe usage',
+      'PwC uses jobs-pwc.icims.com',
+      'Morocco filter via search form',
+    ],
+    domStructureHints: ['.iCIMS_JobsTable', 'icims.com'],
+    robotsPolicy: 'generally_allowed',
+    playwrightRequired: true,
+    adapterModule: 'icims.adapter.ts (planned)',
+    estimatedEmployersMorocco: 3,
+    estimatedJobsUnlockable: 300,
+  },
+  {
+    platform: 'teamtailor',
+    displayName: 'Teamtailor',
+    priority: 60,
+    detectionConfidence: 85,
+    authRequired: false,
+    paginationStrategy: 'json_api',
+    apiEndpointPattern: 'https://{company}.teamtailor.com/jobs.json',
+    networkRequestHints: ['teamtailor.com', 'jobs.json'],
+    detailPageStrategy: 'api_json',
+    rateLimitPerMinute: 40,
+    knownIssues: ['Subdomain per company'],
+    domStructureHints: ['teamtailor.com', 'data-job-id'],
+    robotsPolicy: 'allowed',
+    playwrightRequired: false,
+    adapterModule: 'teamtailor.adapter.ts (planned)',
+    estimatedEmployersMorocco: 2,
+    estimatedJobsUnlockable: 150,
+  },
+  {
+    platform: 'custom',
+    displayName: 'Custom / Unknown ATS',
+    priority: 10,
+    detectionConfidence: 40,
+    authRequired: false,
+    paginationStrategy: 'unknown',
+    apiEndpointPattern: 'varies',
+    networkRequestHints: ['network intercept', 'Playwright request listener'],
+    detailPageStrategy: 'generic_dom',
+    rateLimitPerMinute: 10,
+    knownIssues: [
+      'BPO sites use proprietary APIs behind JS',
+      'HTTP probe picks CSS assets not job APIs',
+      'Requires Playwright network capture',
+    ],
+    domStructureHints: ['varies per employer'],
+    robotsPolicy: 'varies',
+    playwrightRequired: true,
+    adapterModule: 'generic.scraper.ts + network probe',
+    estimatedEmployersMorocco: 40,
+    estimatedJobsUnlockable: 3500,
+  },
+];
+
+export function getPlatformProfile(platform: string): AtsPlatformProfileSeed | undefined {
+  return ATS_PLATFORM_PROFILES.find((p) => p.platform === platform);
+}

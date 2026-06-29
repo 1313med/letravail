@@ -1,10 +1,11 @@
 /**
  * Automated employer onboarding — probe company website and recommend crawl strategy.
  */
-import { probeCareerSite } from '../adapters/career-site-prober.js';
+import { probeCareerSite, probeCareerSiteWithRetries } from '../adapters/career-site-prober.js';
 import type { AtsPlatform } from '../adapters/ats-registry.js';
 import type { PrismaClient } from '@prisma/client';
 import { AtsIntelligenceRepository } from '../repositories/ats-intelligence.repository.js';
+import { classifyInvestigationReasons } from './ats-failure-classifier.js';
 
 export interface EmployerOnboardingReport {
   inputUrl: string;
@@ -26,6 +27,7 @@ export interface EmployerOnboardingReport {
   graphqlDetected: boolean;
   structuredData: boolean;
   issues: string[];
+  investigationReasons: string[];
   nextSteps: string[];
 }
 
@@ -59,7 +61,7 @@ export async function onboardEmployer(
 
   const careersPageUrl = discoverCareersPage(finalUrl, homepageHtml);
   const probeTarget = careersPageUrl ?? websiteUrl;
-  const probe = await probeCareerSite(probeTarget);
+  const probe = await probeCareerSiteWithRetries(probeTarget);
 
   const graphqlDetected = /graphql|__NEXT_DATA__|"query"\s*:/i.test(probe.finalUrl ? homepageHtml : '');
   const structuredData = /application\/ld\+json|JobPosting/i.test(homepageHtml);
@@ -102,6 +104,27 @@ export async function onboardEmployer(
   if (strategy === 'api') nextSteps.push('Register in source catalog — config-only onboarding');
   if (atsDetected === 'talentsoft') nextSteps.push('Use talentsoft.adapter.ts with listing URL');
 
+  const investigationReasons = classifyInvestigationReasons({
+    httpStatus: probe.httpStatus,
+    html: homepageHtml,
+    finalUrl: probe.finalUrl,
+    atsPlatform: atsDetected,
+    apiEndpoints: probe.apiEndpoints,
+    careersPageUrl,
+    robotsAllowed: probe.robotsAllowed,
+    graphqlDetected,
+  });
+
+  if (investigationReasons.includes('cloudflare_protection')) {
+    issues.push('Cloudflare protection detected');
+  }
+  if (investigationReasons.includes('javascript_rendered')) {
+    issues.push('JavaScript-rendered content — Playwright required');
+  }
+  if (investigationReasons.includes('hidden_api')) {
+    issues.push('Hidden API — network intercept required');
+  }
+
   return {
     inputUrl: websiteUrl,
     companyName,
@@ -122,6 +145,7 @@ export async function onboardEmployer(
     graphqlDetected,
     structuredData,
     issues,
+    investigationReasons,
     nextSteps,
   };
 }

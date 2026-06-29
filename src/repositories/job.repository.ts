@@ -99,7 +99,7 @@ export class JobRepository {
             lastSeenAt: now,
             lastVerifiedAt: now,
             ...(contentChanged ? { lastModifiedAt: now } : {}),
-            sourcePublishedAt: job.sourcePublishedAt ?? job.publishedAt,
+            sourcePublishedAt: validDate(job.sourcePublishedAt ?? job.publishedAt),
             crawlCount: { increment: 1 },
             isActive: true,
             archivedAt: null,
@@ -124,7 +124,7 @@ export class JobRepository {
               lastSeenAt: now,
               lastVerifiedAt: now,
               lastModifiedAt: now,
-              sourcePublishedAt: job.sourcePublishedAt ?? job.publishedAt,
+              sourcePublishedAt: validDate(job.sourcePublishedAt ?? job.publishedAt),
               crawlCount: 1,
               isActive: true,
               validationStatus: job.validationStatus ?? 'valid',
@@ -212,8 +212,8 @@ export class JobRepository {
       contractType: job.contractType,
       remote: job.remote ?? false,
       applicationUrl: job.applicationUrl,
-      publishedAt: job.publishedAt,
-      expiresAt: job.expiresAt,
+      publishedAt: validDate(job.publishedAt),
+      expiresAt: validDate(job.expiresAt),
       rawHtml: job.rawHtml,
       extractionMetadata: job.extractionMetadata as Prisma.InputJsonValue | undefined,
       experienceLevel: job.experienceLevel,
@@ -305,4 +305,9 @@ function isUniqueConstraint(error: unknown): boolean {
     'code' in error &&
     (error as { code: string }).code === 'P2002'
   );
+}
+
+function validDate(value: Date | undefined): Date | undefined {
+  if (!value) return undefined;
+  return Number.isNaN(value.getTime()) ? undefined : value;
 }

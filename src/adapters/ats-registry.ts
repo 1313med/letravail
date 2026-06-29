@@ -24,6 +24,8 @@ export interface AtsProfile {
   urlPatterns: RegExp[];
   apiHints?: string[];
   detailFetchStrategy: 'api' | 'dom' | 'hybrid';
+  /** Mission 9 — link to platform mastery profile id */
+  masteryPlatform?: AtsPlatform | 'custom';
 }
 
 export const ATS_REGISTRY: AtsProfile[] = [

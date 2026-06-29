@@ -3,7 +3,7 @@
  */
 import { probeCareerSite } from '../adapters/career-site-prober.js';
 import { onboardEmployer, onboardAndPersist } from './employer-onboarding.js';
-import { MOROCCO_SOURCE_CATALOG } from '../adapters/source-catalog.js';
+import { MOROCCO_SOURCE_CATALOG, getDiscoverySeeds } from '../adapters/source-catalog.js';
 import { logger } from '../lib/logger.js';
 
 export interface DiscoveredEmployer {
@@ -17,25 +17,7 @@ export interface DiscoveredEmployer {
   recommendedSourceName: string;
 }
 
-const SEED_DOMAINS = [
-  'https://www.intelcia.com',
-  'https://www.teleperformance.com',
-  'https://www.foundever.com',
-  'https://www.concentrix.com',
-  'https://www.webhelp.com',
-  'https://www.comdatagroup.com',
-  'https://bcp-cand.talent-soft.com',
-  'https://careers.intelcia.com',
-  'https://www.creditdumaroc.ma',
-  'https://www.creditagricole.ma',
-  'https://www.iam.ma',
-  'https://www.orange.ma',
-  'https://www.inwi.ma',
-  'https://www.ocpgroup.ma',
-  'https://www.marjane.ma',
-  'https://www.capgemini.com/ma-fr',
-  'https://www.accenture.com/ma-fr',
-];
+const SEED_DOMAINS: string[] = [];
 
 export async function discoverEmployers(
   db: import('@prisma/client').PrismaClient,
@@ -52,7 +34,7 @@ export async function discoverEmployers(
     take: 30,
   });
 
-  const seeds = new Set<string>(SEED_DOMAINS);
+  const seeds = new Set<string>([...getDiscoverySeeds(), ...SEED_DOMAINS]);
   for (const { company } of topCompanies) {
     if (company.length < 3) continue;
     const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, '');

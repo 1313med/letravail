@@ -30,56 +30,18 @@ interface WorkdayListResponse {
 
 export async function fetchWorkdayJobs(config: WorkdayConfig): Promise<Job[]> {
   const base = `https://${config.host}/wday/cxs/${config.tenant}/${config.site}`;
+  const seen = new Set<string>();
   const jobs: Job[] = [];
 
+  const searchTerms = config.countryFilter
+    ? ['Morocco', 'Maroc', 'Casablanca', 'Rabat', '']
+    : [''];
+
   try {
-    let offset = 0;
-    const limit = 20;
-    let total = Infinity;
-
-    while (offset < total && jobs.length < 500) {
-      const res = await fetch(`${base}/jobs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'User-Agent': 'LetravailScraper/1.0',
-        },
-        body: JSON.stringify({ appliedFacets: {}, limit, offset, searchText: '' }),
-      });
-
-      if (!res.ok) {
-        logger.warn({ source: config.sourceName, status: res.status, offset }, 'Workday API failed');
-        break;
-      }
-
-      const data = (await res.json()) as WorkdayListResponse;
-      total = data.total ?? 0;
-
-      for (const posting of data.jobPostings ?? []) {
-        const location = posting.locationsText ?? '';
-        if (config.countryFilter && location && !config.countryFilter.test(location)) continue;
-
-        const detail = await fetchWorkdayJobDetail(base, posting.externalPath);
-        const description = detail || posting.bulletFields?.join('\n') || posting.title;
-
-        jobs.push({
-          source: config.sourceName,
-          sourceJobId: posting.externalPath.replace(/^\//, ''),
-          title: posting.title,
-          company: config.companyName,
-          city: extractCity(location) || config.defaultCity || 'Casablanca',
-          country: 'Morocco',
-          description: cleanText(description),
-          applicationUrl: `https://${config.host}${posting.externalPath}`,
-          rawHtml: detail,
-          publishedAt: posting.postedOn ? new Date(posting.postedOn) : undefined,
-          tags: config.tags,
-        });
-      }
-
-      offset += limit;
-      if ((data.jobPostings ?? []).length === 0) break;
+    for (const searchText of searchTerms) {
+      const batch = await fetchWorkdayPageBatch(config, base, searchText, seen);
+      jobs.push(...batch);
+      if (jobs.length >= 500) break;
     }
 
     logger.info({ source: config.sourceName, count: jobs.length }, 'Workday jobs fetched');
@@ -88,6 +50,77 @@ export async function fetchWorkdayJobs(config: WorkdayConfig): Promise<Job[]> {
     logger.error({ err, source: config.sourceName }, 'Workday fetch error');
     return [];
   }
+}
+
+async function fetchWorkdayPageBatch(
+  config: WorkdayConfig,
+  base: string,
+  searchText: string,
+  seen: Set<string>,
+): Promise<Job[]> {
+  const jobs: Job[] = [];
+  let offset = 0;
+  const limit = 50;
+  let total = Infinity;
+
+  while (offset < total) {
+    const res = await fetch(`${base}/jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'LetravailScraper/1.0',
+      },
+      body: JSON.stringify({
+        appliedFacets: {},
+        limit,
+        offset,
+        searchText,
+      }),
+    });
+
+    if (!res.ok) {
+      logger.warn({ source: config.sourceName, status: res.status, offset, searchText }, 'Workday API failed');
+      break;
+    }
+
+    const data = (await res.json()) as WorkdayListResponse;
+    total = data.total ?? 0;
+
+    for (const posting of data.jobPostings ?? []) {
+      const key = posting.externalPath;
+      if (seen.has(key)) continue;
+
+      const location = posting.locationsText ?? '';
+      if (!matchesCountryFilter(config, location, posting)) continue;
+
+      const detail = await fetchWorkdayJobDetail(base, posting.externalPath);
+      const description = detail || posting.bulletFields?.join('\n') || posting.title;
+      if (config.countryFilter && !matchesCountryFilter(config, location, posting, description)) continue;
+
+      seen.add(key);
+      const publishedAt = parseWorkdayDate(posting.postedOn);
+
+      jobs.push({
+        source: config.sourceName,
+        sourceJobId: posting.externalPath.replace(/^\//, ''),
+        title: posting.title,
+        company: config.companyName,
+        city: extractCity(location) || config.defaultCity || 'Casablanca',
+        country: 'Morocco',
+        description: cleanText(description),
+        applicationUrl: `https://${config.host}${posting.externalPath}`,
+        rawHtml: detail,
+        publishedAt,
+        tags: config.tags,
+      });
+    }
+
+    offset += limit;
+    if ((data.jobPostings ?? []).length === 0) break;
+  }
+
+  return jobs;
 }
 
 async function fetchWorkdayJobDetail(base: string, path: string): Promise<string> {
@@ -110,4 +143,21 @@ function extractCity(location: string): string | undefined {
   }
   if (/morocco|maroc/i.test(location)) return 'Casablanca';
   return undefined;
+}
+
+function matchesCountryFilter(
+  config: WorkdayConfig,
+  location: string,
+  posting: { externalPath: string; title: string },
+  extra = '',
+): boolean {
+  if (!config.countryFilter) return true;
+  const haystack = `${location} ${posting.externalPath} ${posting.title} ${extra}`;
+  return config.countryFilter.test(haystack);
+}
+
+function parseWorkdayDate(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }

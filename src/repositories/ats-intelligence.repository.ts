@@ -58,6 +58,7 @@ export class AtsIntelligenceRepository {
         graphqlDetected: report.graphqlDetected,
         structuredData: report.structuredData,
         issues: report.issues,
+        investigationReasons: report.investigationReasons,
         activationState: initialActivationState(report.confidenceScore),
         onboardingStatus: report.confidenceScore >= 70 ? 'ready' : 'probed',
         rawProbe: report as unknown as Prisma.InputJsonValue,

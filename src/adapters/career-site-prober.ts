@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.js';
 export interface CareerSiteProbe {
   url: string;
   finalUrl: string;
+  httpStatus?: number;
   atsPlatform: AtsPlatform;
   robotsAllowed: boolean;
   sitemapUrls: string[];
@@ -23,12 +24,14 @@ export async function probeCareerSite(url: string): Promise<CareerSiteProbe> {
   const ats = detectAtsPlatform(url);
   let finalUrl = url;
   let html = '';
+  let httpStatus: number | undefined;
 
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'LetravailScraper/1.0', Accept: 'text/html' },
       redirect: 'follow',
     });
+    httpStatus = res.status;
     finalUrl = res.url;
     html = await res.text();
   } catch (err) {
@@ -58,10 +61,14 @@ export async function probeCareerSite(url: string): Promise<CareerSiteProbe> {
   }
 
   let talentSoftListing: string | undefined;
-  if (/talent-soft\.com/i.test(finalUrl) || /talent-soft\.com/i.test(html)) {
+  if (
+    /talent-soft\.com/i.test(finalUrl) ||
+    /talent-soft\.com/i.test(html) ||
+    /carriere\.[a-z0-9-]+\.ma/i.test(finalUrl)
+  ) {
     talentSoftListing = finalUrl.includes('liste-toutes-offres')
       ? finalUrl
-      : `${new URL(finalUrl).origin}/offre-de-emploi/liste-toutes-offres.aspx?all=1&mode=layer`;
+      : `${new URL(finalUrl).origin}/offre-de-emploi/liste-toutes-offres.aspx?all=1&mode=list`;
     apiEndpoints.push(talentSoftListing);
   }
 
@@ -87,6 +94,7 @@ export async function probeCareerSite(url: string): Promise<CareerSiteProbe> {
   return {
     url,
     finalUrl,
+    httpStatus,
     atsPlatform: platform,
     robotsAllowed,
     sitemapUrls,
@@ -126,3 +134,44 @@ async function checkRobotsAllowed(url: string): Promise<boolean> {
 }
 
 export { MOROCCO_FILTER };
+
+const ALT_CAREER_PATHS = [
+  '/carrieres', '/carrières', '/careers', '/recrutement', '/jobs', '/offres-emploi', '/nous-rejoindre',
+];
+
+export async function probeCareerSiteWithRetries(url: string): Promise<CareerSiteProbe> {
+  let best = await probeCareerSite(url);
+  if (best.apiEndpoints.length > 0 && best.atsPlatform !== 'custom') return best;
+
+  let origin: string;
+  try {
+    origin = new URL(best.finalUrl || url).origin;
+  } catch {
+    return best;
+  }
+
+  for (const path of ALT_CAREER_PATHS) {
+    try {
+      const altUrl = `${origin}${path}`;
+      if (altUrl === url || altUrl === best.finalUrl) continue;
+      const alt = await probeCareerSite(altUrl);
+      const altScore = scoreProbe(alt);
+      const bestScore = scoreProbe(best);
+      if (altScore > bestScore) best = alt;
+      if (best.apiEndpoints.length > 0 && best.atsPlatform !== 'custom') break;
+    } catch {
+      continue;
+    }
+  }
+
+  return best;
+}
+
+function scoreProbe(probe: CareerSiteProbe): number {
+  let score = probe.atsPlatform !== 'custom' ? 50 : 0;
+  score += probe.apiEndpoints.length * 10;
+  if (probe.workdayConfig) score += 20;
+  if (probe.greenhouseToken) score += 20;
+  if (probe.leverSlug) score += 20;
+  return score;
+}

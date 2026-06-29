@@ -50,6 +50,7 @@ import {
   XceedScraper,
   AdmValueScraper,
 } from './bpo/index.js';
+import { createMissionEmployerRegistrations } from './employers/mission-employers.js';
 import type { ScraperRegistration } from '../services/scrape.service.js';
 
 type ScraperCtor = new (pagePool?: PagePool) => import('./base.scraper.js').BaseScraper;
@@ -122,6 +123,12 @@ export const scraperRegistry: ScraperRegistration[] = [
   register(MajorelScraper),
   register(OutsourciaScraper),
   register(XceedScraper),
+  ...createMissionEmployerRegistrations().map((m) => ({
+    sourceName: m.sourceName,
+    category: m.category,
+    factory: m.factory,
+    schedule: 'every6hours' as const,
+  })),
 ];
 
 export function getSourcesByCategory(category: ScrapeCategory): string[] {

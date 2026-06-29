@@ -216,6 +216,7 @@ model EmployerAtsIntelligence {
   graphqlDetected       Boolean  @default(false)
   structuredData        Boolean  @default(false)
   issues                String[] @default([])
+  investigationReasons  String[] @default([])
   onboardingStatus      String   @default("probed")
   activationState       String   @default("PROBED")
   healthScore           Float?
@@ -244,6 +245,48 @@ model EmployerAtsIntelligence {
   @@index([healthScore])
   @@index([nextRetryAt])
   @@map("employer_ats_intelligence")
+}
+
+/// Platform-level ATS mastery — one row per ATS, static profile + live metrics.
+model AtsPlatformIntelligence {
+  platform                String   @id
+  displayName             String
+  priority                Int      @default(50)
+  detectionConfidence     Float    @default(70)
+  authRequired            Boolean  @default(false)
+  paginationStrategy      String?
+  apiEndpointPattern      String?
+  networkRequestHints     String[] @default([])
+  detailPageStrategy      String?
+  rateLimitPerMinute      Int?
+  knownIssues             String[] @default([])
+  domStructureHints       String[] @default([])
+  robotsPolicy            String?
+  playwrightRequired      Boolean  @default(false)
+  adapterModule           String?
+  employerCount           Int      @default(0)
+  activeEmployerCount     Int      @default(0)
+  probedEmployerCount     Int      @default(0)
+  jobsCaptured            Int      @default(0)
+  crawlAttempts           Int      @default(0)
+  crawlSuccesses          Int      @default(0)
+  successRate             Float?
+  failureRate             Float?
+  avgCrawlDurationMs    Int?
+  avgDescriptionQuality   Float?
+  avgEntityExtraction     Float?
+  historicalSuccessRate   Float?
+  estimatedEmployers      Int      @default(0)
+  estimatedJobsUnlockable Int      @default(0)
+  avgQualityScore         Float?
+  roiScore                Float?
+  lastMetricsAt           DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([priority])
+  @@index([roiScore])
+  @@map("ats_platform_intelligence")
 }
 
 model Location {

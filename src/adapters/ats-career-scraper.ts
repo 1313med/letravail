@@ -9,6 +9,7 @@ import { fetchWorkdayJobs } from './workday.adapter.js';
 import { discoverWorkdaySite } from './workday-discover.js';
 import { fetchSmartRecruitersJobs } from './smartrecruiters.adapter.js';
 import { fetchTalentSoftJobs, isTalentSoftUrl } from './talentsoft.adapter.js';
+import { fetchSuccessFactorsJobs, detectSuccessFactorsApiUrl } from './successfactors.adapter.js';
 import { MOROCCO_FILTER, probeCareerSite } from './career-site-prober.js';
 import { createGenericScraper } from '../scrapers/generic.scraper.js';
 import type { ScrapeCategory } from '../config/index.js';
@@ -110,6 +111,17 @@ export async function fetchAtsCareerJobs(
       if (jobs.length > 0) return jobs;
     }
 
+    if (/careers\.|recrutement|successfactors/i.test(url)) {
+      const sfJobs = await fetchSuccessFactorsJobs({
+        sourceName: config.sourceName,
+        companyName: config.companyName,
+        careersOrigin: new URL(url).origin,
+        tags: config.tags,
+        defaultCity: config.defaultCity,
+      });
+      if (sfJobs.length > 0) return sfJobs;
+    }
+
     const probe = await probeCareerSite(url);
     if (probe.greenhouseToken) {
       const jobs = await fetchGreenhouseJobs({
@@ -144,6 +156,19 @@ export async function fetchAtsCareerJobs(
         countryFilter: MOROCCO_FILTER,
       });
       if (jobs.length > 0) return jobs;
+    }
+
+    const sfApi = detectSuccessFactorsApiUrl('', probe.finalUrl);
+    if (sfApi || probe.atsPlatform === 'successfactors') {
+      const sfJobs = await fetchSuccessFactorsJobs({
+        sourceName: config.sourceName,
+        companyName: config.companyName,
+        careersOrigin: new URL(probe.finalUrl).origin,
+        tags: config.tags,
+        defaultCity: config.defaultCity,
+        apiUrl: sfApi,
+      });
+      if (sfJobs.length > 0) return sfJobs;
     }
   }
 

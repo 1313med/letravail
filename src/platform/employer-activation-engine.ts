@@ -39,6 +39,16 @@ export class EmployerActivationEngine {
       return this.reject(intel, 'No sourceName — cannot activate unregistered employer');
     }
 
+    const sourceName = intel.sourceName;
+
+    if (intel.activationState === 'PROBED' && intel.confidence >= 70) {
+      await this.activationRepo.transition(intel.id, 'READY', {
+        reason: `Probe confidence ${intel.confidence} — ready for validation`,
+        automatic: true,
+      });
+      intel = { ...intel, activationState: 'READY' };
+    }
+
     if (isUnknownSource(intel)) {
       return this.reject(intel, 'Unknown ATS/source — requires manual investigation');
     }
@@ -49,7 +59,7 @@ export class EmployerActivationEngine {
     }
 
     const apiWorks = await this.checkEndpoints(intel);
-    const sample = await runSampleCrawl(this.scrapeService, intel.sourceName);
+    const sample = await runSampleCrawl(this.scrapeService, sourceName);
     const validation = validateSampleCrawl(sample.jobs, {
       minJobs: intel.crawlStrategy === 'api' ? 1 : 1,
     });
@@ -119,8 +129,11 @@ export class EmployerActivationEngine {
   async runValidationCrawls(limit = 15): Promise<ActivationDecision[]> {
     const targets = await this.db.employerAtsIntelligence.findMany({
       where: {
-        activationState: { in: ['READY', 'PROBED', 'VALIDATED'] },
         sourceName: { not: null },
+        OR: [
+          { activationState: { in: ['READY', 'VALIDATED', 'PROBED'] } },
+        ],
+        confidence: { gte: 60 },
       },
       orderBy: { confidence: 'desc' },
       take: limit,

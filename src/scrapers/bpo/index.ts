@@ -3,6 +3,7 @@ import type { PagePool } from '../../lib/browser/page-pool.js';
 import { BaseScraper } from '../base.scraper.js';
 import { fetchAtsCareerJobs } from '../../adapters/ats-career-scraper.js';
 import { fetchIntelciaJobs } from '../../adapters/intelcia.adapter.js';
+import { fetchSuccessFactorsJobs } from '../../adapters/successfactors.adapter.js';
 import { createGenericScraper } from '../generic.scraper.js';
 
 class BpoScraper extends BaseScraper {
@@ -40,6 +41,20 @@ class BpoScraper extends BaseScraper {
       });
       if (jobs.length > 0) return jobs;
     }
+
+    for (const url of this.atsConfig.careerUrls) {
+      if (/careers\.|successfactors/i.test(url)) {
+        const sfJobs = await fetchSuccessFactorsJobs({
+          sourceName: this.sourceName,
+          companyName: this.companyName,
+          careersOrigin: new URL(url).origin,
+          tags: this.atsConfig.tags,
+          defaultCity: this.atsConfig.defaultCity,
+        });
+        if (sfJobs.length > 0) return sfJobs;
+      }
+    }
+
     const apiJobs = await fetchAtsCareerJobs(this.atsConfig, this.pagePool);
     if (apiJobs.length > 0) return apiJobs;
     return this.genericInner.scrapeWithPool(this.pagePool);

@@ -68,6 +68,7 @@ export class ScrapeService {
 
   async scrapeLinkedIn(): Promise<ScrapeRunStats> {
     const { LinkedInScraper } = await import('../scrapers/linkedin/linkedin.scraper.js');
+    const { runLinkedInEmployerDiscovery } = await import('../platform/linkedin-employer-discovery.service.js');
     const startedAt = new Date();
     const scraper = new LinkedInScraper();
 
@@ -81,6 +82,22 @@ export class ScrapeService {
       const result = await this.persistEnriched(jobs, 'linkedin');
       persist = result.persist;
       validationReport = result.validationReport;
+
+      const discoveryReport = await runLinkedInEmployerDiscovery(
+        getPrisma(),
+        scraper.getLastEmployerHints(),
+      ).catch((err) => {
+        logger.warn({ err }, 'LinkedIn employer discovery failed — continuing');
+        return null;
+      });
+
+      if (discoveryReport) {
+        validationReport = {
+          ...validationReport,
+          linkedinDiscovery: discoveryReport,
+        };
+      }
+
       const expired = await this.jobRepo.deactivateExpired();
       const unverified = await this.jobRepo.archiveUnverified('linkedin', 14);
       if (expired > 0 || unverified > 0) {

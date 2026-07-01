@@ -6,11 +6,14 @@ import type { Page } from 'playwright';
 import { logger } from '../../lib/logger.js';
 import { cleanText, stripHtml } from '../../utils/cleaning.js';
 import { parseJobSections } from '../../enrichment/section-parser.js';
+import { parseLinkedInCompanyUrl } from './employer-hint.js';
 
 export interface LinkedInDetailResult {
   title: string;
   company: string;
   city: string;
+  companyLinkedInUrl?: string;
+  companyLinkedInSlug?: string;
   description: string;
   requirements?: string;
   benefits?: string;
@@ -76,6 +79,12 @@ function parseGuestApiHtml(html: string, method: 'guest-api' | 'playwright'): Li
   const titleMatch =
     html.match(/<h2[^>]*class="[^"]*top-card-layout__title[^"]*"[^>]*>([\s\S]*?)<\/h2>/i)
     ?? html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const companyLinkMatch =
+    html.match(/<a[^>]*class="[^"]*topcard__org-name-link[^"]*"[^>]*href="([^"]+)"/i)
+    ?? html.match(/<a[^>]*href="(https?:\/\/[^"]*\/company\/[^"]+)"[^>]*class="[^"]*topcard__org-name-link/i);
+  const companyLinkedInUrl = companyLinkMatch?.[1]?.split('?')[0];
+  const companySlug = companyLinkedInUrl ? parseLinkedInCompanyUrl(companyLinkedInUrl)?.slug : undefined;
+
   const companyMatch =
     html.match(/<a[^>]*class="[^"]*topcard__org-name-link[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
     ?? html.match(/class="[^"]*top-card-layout__card[^"]*"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
@@ -93,6 +102,8 @@ function parseGuestApiHtml(html: string, method: 'guest-api' | 'playwright'): Li
     title: cleanText(stripTags(titleMatch?.[1] ?? '')),
     company: cleanText(stripTags(companyMatch?.[1] ?? '')),
     city: cleanText(stripTags(cityMatch?.[1] ?? '')),
+    companyLinkedInUrl,
+    companyLinkedInSlug: companySlug,
     description: sections.body || description,
     requirements: sections.requirements,
     benefits: sections.benefits,
@@ -145,16 +156,23 @@ async function fetchViaPlaywright(page: Page, jobId: string): Promise<LinkedInDe
         }
       }
       const title = document.querySelector('h1, .job-details-jobs-unified-top-card__job-title')?.textContent?.trim() ?? '';
-      const company = document.querySelector('.job-details-jobs-unified-top-card__company-name a, .topcard__org-name-link')?.textContent?.trim() ?? '';
+      const companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name a, .topcard__org-name-link') as HTMLAnchorElement | null;
+      const company = companyEl?.textContent?.trim() ?? '';
+      const companyLinkedInUrl = companyEl?.href?.split('?')[0];
       const city = document.querySelector('.job-details-jobs-unified-top-card__bullet, .topcard__flavor--bullet')?.textContent?.trim() ?? '';
-      return { title, company, city, description, rawHtml };
+      return { title, company, city, companyLinkedInUrl, description, rawHtml };
     }, DESCRIPTION_SELECTORS);
 
     const sections = parseJobSections(cleanText(data.description));
+    const companySlug = data.companyLinkedInUrl
+      ? data.companyLinkedInUrl.match(/\/company\/([^/]+)/i)?.[1]?.toLowerCase()
+      : undefined;
     return {
       title: cleanText(data.title),
       company: cleanText(data.company),
       city: cleanText(data.city),
+      companyLinkedInUrl: data.companyLinkedInUrl,
+      companyLinkedInSlug: companySlug,
       description: sections.body || cleanText(data.description),
       requirements: sections.requirements,
       benefits: sections.benefits,

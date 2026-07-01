@@ -124,11 +124,53 @@ model Company {
   updatedAt     DateTime @updatedAt
   jobs          Job[]
   aliases       CompanyAlias[]
+  discoveries   EmployerDiscovery[]
 
   @@index([slug])
   @@index([name])
   @@index([canonicalName])
+  @@index([linkedinUrl])
   @@map("companies")
+}
+
+model EmployerDiscovery {
+  id               String    @id @default(cuid())
+  companyName      String
+  normalizedName   String
+  linkedinUrl      String?
+  linkedinSlug     String?
+  industry         String?
+  headquarters     String?
+  location         String?
+  companySize      String?
+  logoUrl          String?
+  description      String?   @db.Text
+  websiteUrl       String?
+  careersUrl       String?
+  hiringStatus     String    @default("unknown")
+  discoverySource  String
+  discoveredAt     DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  jobCountSeen     Int       @default(1)
+  onboardingStatus String    @default("discovered")
+  recommendedSourceName String?
+  sourceName       String?
+  companyId        String?
+  atsPlatform      String?
+  probeConfidence  Float?
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  company          Company?  @relation(fields: [companyId], references: [id])
+
+  @@unique([normalizedName])
+  @@unique([linkedinSlug])
+  @@index([companyName])
+  @@index([onboardingStatus])
+  @@index([discoveredAt])
+  @@index([lastSeenAt])
+  @@index([hiringStatus])
+  @@map("employer_discoveries")
 }
 
 model CompanyAlias {

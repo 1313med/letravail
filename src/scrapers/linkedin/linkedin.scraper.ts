@@ -46,6 +46,26 @@ import {
 
 } from './detail-fetcher.js';
 
+import {
+
+  type LinkedInEmployerHint,
+
+  mergeEmployerHints,
+
+  isValidEmployerName,
+
+  parseLinkedInCompanyUrl,
+
+} from './employer-hint.js';
+
+import {
+
+  fetchLinkedInCompanyProfile,
+
+  companyProfileToHint,
+
+} from './company-page-fetcher.js';
+
 
 
 interface RawLinkedInJob {
@@ -108,6 +128,18 @@ export class LinkedInScraper {
 
   private baselineAvgDescLen = 0;
 
+  private employerHints: LinkedInEmployerHint[] = [];
+
+
+
+  /** Hints collected during the last crawl — consumed by the discovery pipeline. */
+
+  getLastEmployerHints(): LinkedInEmployerHint[] {
+
+    return this.employerHints;
+
+  }
+
 
 
   async run(): Promise<Job[]> {
@@ -117,6 +149,8 @@ export class LinkedInScraper {
     this.diagnosticResults = [];
 
     this.skippedCount = 0;
+
+    this.employerHints = [];
 
     this.baselineAvgDescLen = await this.loadDbBaseline();
 
@@ -264,6 +298,8 @@ export class LinkedInScraper {
 
       jobs = await this.enrichAllDescriptions(page, jobs);
 
+      jobs = await this.discoverEmployersFromCrawl(page, jobs);
+
 
 
       return jobs.map((raw) => this.toJob(raw));
@@ -362,6 +398,8 @@ export class LinkedInScraper {
 
         applicationUrl: string;
 
+        companyLinkedInUrl?: string;
+
       }> = [];
 
       const seen = new Set<string>();
@@ -406,6 +444,12 @@ export class LinkedInScraper {
 
 
 
+        const companyLink = card?.querySelector('a[href*="/company/"]') as HTMLAnchorElement | null;
+
+        const companyLinkedInUrl = companyLink?.href?.split('?')[0];
+
+
+
         const company =
 
           card?.querySelector(
@@ -442,6 +486,8 @@ export class LinkedInScraper {
 
           applicationUrl: href.split('?')[0]!,
 
+          companyLinkedInUrl,
+
         });
 
       }
@@ -456,21 +502,51 @@ export class LinkedInScraper {
 
       .filter((j) => isLikelyLinkedInJobTitle(j.title))
 
-      .map((j) => ({
+      .map((j) => {
 
-        jobId: j.jobId,
+        if (isValidEmployerName(j.company)) {
 
-        title: j.title,
+          this.employerHints.push({
 
-        company: j.company,
+            companyName: j.company,
 
-        city: j.city || defaultCity,
+            linkedinUrl: j.companyLinkedInUrl,
 
-        applicationUrl: j.applicationUrl,
+            linkedinSlug: j.companyLinkedInUrl
 
-        description: j.title,
+              ? parseLinkedInCompanyUrl(j.companyLinkedInUrl)?.slug
 
-      }));
+              : undefined,
+
+            location: j.city || defaultCity,
+
+            hiringStatus: 'actively_hiring',
+
+            discoverySource: 'job_search',
+
+            jobIds: [j.jobId],
+
+          });
+
+        }
+
+        return {
+
+          jobId: j.jobId,
+
+          title: j.title,
+
+          company: j.company,
+
+          city: j.city || defaultCity,
+
+          applicationUrl: j.applicationUrl,
+
+          description: j.title,
+
+        };
+
+      });
 
 
 
@@ -570,6 +646,30 @@ export class LinkedInScraper {
 
         });
 
+
+
+        if (isValidEmployerName(detail.company || job.company)) {
+
+          this.employerHints.push({
+
+            companyName: detail.company || job.company,
+
+            linkedinUrl: detail.companyLinkedInUrl,
+
+            linkedinSlug: detail.companyLinkedInSlug,
+
+            location: detail.city || job.city,
+
+            hiringStatus: 'actively_hiring',
+
+            discoverySource: 'job_detail',
+
+            jobIds: [job.jobId],
+
+          });
+
+        }
+
       }
 
 
@@ -599,6 +699,152 @@ export class LinkedInScraper {
       ...skipped,
 
     ];
+
+  }
+
+
+
+  /** Enrich employer hints with company page metadata for slugs we have not seen. */
+
+  private async discoverEmployersFromCrawl(
+
+    page: Page,
+
+    jobs: RawLinkedInJob[],
+
+  ): Promise<RawLinkedInJob[]> {
+
+    this.employerHints = mergeEmployerHints(this.employerHints);
+
+
+
+    const slugsToFetch = new Set<string>();
+
+    for (const hint of this.employerHints) {
+
+      if (hint.linkedinSlug) slugsToFetch.add(hint.linkedinSlug);
+
+    }
+
+
+
+    const maxProfiles = Number(process.env.LINKEDIN_COMPANY_FETCH_LIMIT ?? 25);
+
+    const slugs = [...slugsToFetch].slice(0, maxProfiles);
+
+
+
+    logger.info(
+
+      { uniqueEmployers: this.employerHints.length, companyPagesToFetch: slugs.length },
+
+      'LinkedIn employer discovery — fetching company profiles',
+
+    );
+
+
+
+    for (const slug of slugs) {
+
+      const profile = await fetchLinkedInCompanyProfile(slug);
+
+      if (profile) {
+
+        this.employerHints.push(companyProfileToHint(profile));
+
+      }
+
+      await sleep(400);
+
+    }
+
+
+
+    const related = await this.extractRelatedCompanies(page);
+
+    this.employerHints.push(...related);
+
+
+
+    this.employerHints = mergeEmployerHints(this.employerHints);
+
+
+
+    logger.info(
+
+      { totalEmployerHints: this.employerHints.length, jobsScraped: jobs.length },
+
+      'LinkedIn employer discovery complete',
+
+    );
+
+
+
+    return jobs;
+
+  }
+
+
+
+  private async extractRelatedCompanies(page: Page): Promise<LinkedInEmployerHint[]> {
+
+    const hints: LinkedInEmployerHint[] = [];
+
+    try {
+
+      const related = await page.evaluate(() => {
+
+        const out: Array<{ name: string; url: string }> = [];
+
+        for (const anchor of Array.from(document.querySelectorAll('a[href*="/company/"]'))) {
+
+          const el = anchor as HTMLAnchorElement;
+
+          const href = el.href?.split('?')[0];
+
+          const name = el.textContent?.trim() ?? '';
+
+          if (!href || name.length < 2 || name.length > 100) continue;
+
+          if (/voir|see|linkedin|emploi|job/i.test(name)) continue;
+
+          out.push({ name, url: href });
+
+        }
+
+        return out;
+
+      });
+
+
+
+      for (const { name, url } of related) {
+
+        if (!isValidEmployerName(name)) continue;
+
+        hints.push({
+
+          companyName: name,
+
+          linkedinUrl: url,
+
+          linkedinSlug: parseLinkedInCompanyUrl(url)?.slug,
+
+          discoverySource: 'related_company',
+
+          hiringStatus: 'unknown',
+
+        });
+
+      }
+
+    } catch {
+
+      /* non-fatal */
+
+    }
+
+    return hints;
 
   }
 

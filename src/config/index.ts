@@ -21,10 +21,13 @@ export const config = {
   linkedinDetailFetchAll: process.env.LINKEDIN_DETAIL_FETCH_ALL !== 'false',
   linkedinPageTimeoutMs: Number(process.env.LINKEDIN_PAGE_TIMEOUT_MS ?? 25_000),
   linkedinMaxPages: Number(process.env.LINKEDIN_MAX_PAGES ?? 10),
-  linkedinFast: process.env.LINKEDIN_FAST === 'true',
-  detailFetchLimit: Number(process.env.DETAIL_FETCH_LIMIT ?? 500),
-  detailFetchDelayMs: Number(process.env.DETAIL_FETCH_DELAY_MS ?? 400),
-} as const;
+    linkedinFast: process.env.LINKEDIN_FAST === 'true',
+    detailFetchLimit: Number(process.env.DETAIL_FETCH_LIMIT ?? 500),
+    detailFetchDelayMs: Number(process.env.DETAIL_FETCH_DELAY_MS ?? 400),
+    linkedinDiscoveryEnabled: process.env.LINKEDIN_DISCOVERY_ENABLED !== 'false',
+    linkedinDiscoveryOnboardLimit: Number(process.env.LINKEDIN_DISCOVERY_ONBOARD_LIMIT ?? 5),
+    linkedinCompanyFetchLimit: Number(process.env.LINKEDIN_COMPANY_FETCH_LIMIT ?? 25),
+  } as const;
 
 export type ScrapeCategory =
   | 'banks'
